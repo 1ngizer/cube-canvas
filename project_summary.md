@@ -59,7 +59,7 @@ Con esos datos la herramienta calcula el efectivo disponible después de pagar d
 | # | Tarea | Estado |
 |---|-------|--------|
 | 1 | **Obtener el modelo Excel del cliente** con fórmulas definitivas de amortización bancaria e impuestos para calibración fina. | **Pendiente** (solicitado al cliente). |
-| 2 | **Branding corporativo final**: Incorporar imagotipo oficial de Ingizer / Cube Canvas en SVG y favicon. | Pendiente |
+| 2 | **Branding corporativo final**: Incorporar imagotipo oficial de Ingizer / Cube Canvas en SVG y favicon. | **Completado** (`public/favicon.svg` y logo 3D isométrico en navbar e index.html). |
 | 3 | **Configurar despliegue continuo** (Vercel / Netlify) bajo subdominio de `ingizer.com`. | **Config lista** (`vercel.json` y `netlify.toml` en la raíz, build verificado). Falta: conectar el repo en Vercel/Netlify (cuenta del usuario) y apuntar subdominio. |
 | 4 | **Autenticación / Multi-usuario** (en caso de requerir guardar escenarios en la nube con base de datos en vez de solo localStorage). | Backlog futuro |
 

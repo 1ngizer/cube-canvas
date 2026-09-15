@@ -283,6 +283,7 @@ export default function App() {
       {/* BARRA DE HERRAMIENTAS SUPERIOR */}
       <header className="bcc-top-navbar no-print">
         <div className="nav-brand-section">
+          <img src="/favicon.svg" alt="Cube Canvas Logo" className="nav-brand-icon" style={{ width: "24px", height: "24px" }} />
           <div className="ingizer-badge">iNGIZER</div>
           <h1 className="nav-main-title">Business Cube Commands (BCC)</h1>
           <span className="nav-tagline">Growth & Capital Stack Canvas</span>

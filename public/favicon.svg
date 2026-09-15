@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="topFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00D06C" />
+      <stop offset="100%" stop-color="#00B050" />
+    </linearGradient>
+    <linearGradient id="leftFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0070C0" />
+      <stop offset="100%" stop-color="#004C8C" />
+    </linearGradient>
+    <linearGradient id="rightFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A2540" />
+      <stop offset="100%" stop-color="#061826" />
+    </linearGradient>
+    <linearGradient id="accentGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#00B050" />
+    </linearGradient>
+  </defs>
+
+  <!-- Top Face -->
+  <polygon points="32,6 56,19 32,32 8,19" fill="url(#topFace)" stroke="#10B981" stroke-width="1.5" stroke-linejoin="round" />
+  
+  <!-- Left Face -->
+  <polygon points="8,19 32,32 32,58 8,45" fill="url(#leftFace)" stroke="#0284C7" stroke-width="1.5" stroke-linejoin="round" />
+  
+  <!-- Right Face -->
+  <polygon points="32,32 56,19 56,45 32,58" fill="url(#rightFace)" stroke="#1E293B" stroke-width="1.5" stroke-linejoin="round" />
+
+  <!-- Internal Grid lines on Top Face to represent Canvas -->
+  <line x1="20" y1="12.5" x2="44" y2="25.5" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="1.2" />
+  <line x1="44" y1="12.5" x2="20" y2="25.5" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="1.2" />
+
+  <!-- Center Core Node -->
+  <circle cx="32" cy="32" r="3.5" fill="url(#accentGlow)" />
+</svg>
