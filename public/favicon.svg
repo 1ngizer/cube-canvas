@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="topFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00b050"/>
+      <stop offset="100%" stop-color="#22c55e"/>
+    </linearGradient>
+    <linearGradient id="leftFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0070c0"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="rightFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00b0f0"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- ISOMETRIC CUBE CANVAS LOGO -->
+  <!-- Top Face (Green - Growth & Strategy) -->
+  <polygon points="32,6 56,19 32,32 8,19" fill="url(#topFace)"/>
+  
+  <!-- Left Face (Dark Blue - Investment & Capex) -->
+  <polygon points="8,19 32,32 32,58 8,45" fill="url(#leftFace)"/>
+  
+  <!-- Right Face (Bright Blue - Capital Stack & Blitzscaling) -->
+  <polygon points="32,32 56,19 56,45 32,58" fill="url(#rightFace)"/>
+  
+  <!-- Grid Lines on Top Face (Canvas Spreadsheet Style) -->
+  <line x1="20" y1="12.5" x2="44" y2="25.5" stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.6"/>
+  <line x1="44" y1="12.5" x2="20" y2="25.5" stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.6"/>
+  
+  <!-- Inner Dynamic Arrow Symbol in Center -->
+  <circle cx="32" cy="32" r="3" fill="#ffffff"/>
+</svg>
