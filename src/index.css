@@ -2806,4 +2806,178 @@ html, body {
   font-weight: 800;
 }
 
+/* ========================================================================= */
+/* ESTILOS PARA EL MODAL DE AYUDA Y METODOLOGÍA (HELP MODAL) */
+/* ========================================================================= */
+.btn-help {
+  background-color: #f1f5f9;
+  border: 1px solid var(--border-excel);
+  color: #475569;
+  font-weight: 700;
+}
+
+.btn-help:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.help-tabs-bar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1.5rem 0 1.5rem;
+  background-color: #f8fafc;
+  border-bottom: 1px solid var(--border-excel);
+}
+
+.help-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.help-tab-btn:hover {
+  color: #0f172a;
+}
+
+.help-tab-btn.active {
+  color: #059669;
+  border-bottom-color: #059669;
+  background-color: #ffffff;
+}
+
+.help-section h3 {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 0.5rem;
+}
+
+.help-section p {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-bottom: 0.75rem;
+}
+
+.help-highlight-box {
+  background-color: #f0fdf4;
+  border-left: 4px solid #059669;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.82rem;
+  color: #065f46;
+  margin-bottom: 1rem;
+}
+
+.help-grid-3cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.help-col-card {
+  border-radius: 6px;
+  padding: 0.75rem;
+  border: 1px solid var(--border-excel);
+}
+
+.help-col-card.green {
+  background: #f0fdf4;
+  border-top: 3px solid #059669;
+}
+
+.help-col-card.orange {
+  background: #fffbeb;
+  border-top: 3px solid #d97706;
+}
+
+.help-col-card.blue {
+  background: #f0f9ff;
+  border-top: 3px solid #0284c7;
+}
+
+.help-col-card h4 {
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 0.35rem;
+}
+
+.help-col-card.green h4 { color: #065f46; }
+.help-col-card.orange h4 { color: #92400e; }
+.help-col-card.blue h4 { color: #075985; }
+
+.help-col-card p {
+  font-size: 0.72rem;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.glossary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.glossary-item {
+  background: #f8fafc;
+  border: 1px solid var(--border-excel);
+  border-radius: 6px;
+  padding: 0.65rem 0.85rem;
+}
+
+.glossary-item strong {
+  font-size: 0.8rem;
+  color: #0f172a;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.glossary-item p {
+  font-size: 0.74rem;
+  color: #334155;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.shortcuts-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.shortcuts-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.shortcuts-table kbd {
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+  color: #334155;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 5px;
+}
+
+
 
