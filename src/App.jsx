@@ -5,6 +5,7 @@ import AiSettingsModal from "./components/AiSettingsModal";
 import StressTestModal from "./components/StressTestModal";
 import WaterfallModal from "./components/WaterfallModal";
 import InvestorPitchModal from "./components/InvestorPitchModal";
+import ForecastModal from "./components/ForecastModal";
 import { calculateBccMetrics, formatCurrency } from "./utils/finance";
 import { exportCanvasToExcel } from "./utils/excelExport";
 
@@ -147,6 +148,7 @@ export default function App() {
   const [showStressModal, setShowStressModal] = useState(false);
   const [showWaterfallModal, setShowWaterfallModal] = useState(false);
   const [showPitchModal, setShowPitchModal] = useState(false);
+  const [showForecastModal, setShowForecastModal] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const fileInputRef = useRef(null);
@@ -433,6 +435,15 @@ export default function App() {
 
           <button
             type="button"
+            className="nav-btn btn-forecast"
+            onClick={() => setShowForecastModal(true)}
+            title="Proyección financiera a 12 meses: rampa de arranque, punto de equilibrio y análisis de liquidez"
+          >
+            📈 Proyección 12M
+          </button>
+
+          <button
+            type="button"
             className="nav-btn btn-excel"
             onClick={() => exportCanvasToExcel(canvasState)}
             title="Exportar libro completo a Excel (.xlsx) con fórmulas, requerimientos 2C y amortización"
@@ -556,6 +567,13 @@ export default function App() {
         onClose={() => setShowPitchModal(false)}
         state={canvasState}
         metrics={metrics}
+      />
+
+      {/* MODAL PROYECCIÓN 12 MESES & RAMP-UP */}
+      <ForecastModal
+        isOpen={showForecastModal}
+        onClose={() => setShowForecastModal(false)}
+        state={canvasState}
       />
 
       {/* LIENZO PRINCIPAL DEL CANVAS BCC (100VH PANTALLA ÚNICA) */}
