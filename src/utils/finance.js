@@ -59,15 +59,19 @@ export function calculateLoanAmortizationSchedule(principal, rateEA, months, max
   const totalMonths = Math.min(n, maxRows);
 
   for (let m = 1; m <= totalMonths; m++) {
+    const startingBalance = balance;
     const interest = balance * i;
     const principalPaid = payment - interest;
     balance = Math.max(0, balance - principalPaid);
     schedule.push({
       month: m,
+      startingBalance: Math.round(startingBalance),
       payment: Math.round(payment),
       interest: Math.round(interest),
       principalPaid: Math.round(principalPaid),
+      principal: Math.round(principalPaid),
       balance: Math.round(balance),
+      endingBalance: Math.round(balance),
     });
   }
   return schedule;
@@ -412,5 +416,171 @@ export function calculateCashImpact(formData) {
     statusTitle: bcc.statusTitle,
     statusDesc: bcc.statusDesc,
     statusIcon: bcc.statusIcon,
+  };
+}
+
+/**
+ * Calcula las métricas de Punto de Equilibrio (Break-Even) mensual y diario.
+ * @param {Object} metrics - Métricas calculadas por calculateBccMetrics
+ * @returns {Object}
+ */
+export function calculateBreakEvenMetrics(metrics) {
+  const totalSales = metrics?.totalProductSales || 0;
+  const totalCogs = metrics?.totalCOGS || 0;
+  const fixedOpex = metrics?.totalW || 0;
+  const debtService = metrics?.totalMonthlyDebtService || 0;
+  const totalFixedCosts = fixedOpex + debtService;
+
+  const grossMarginRatio = totalSales > 0 ? (totalSales - totalCogs) / totalSales : 0;
+  const breakEvenSalesMonthly = grossMarginRatio > 0 ? Math.round(totalFixedCosts / grossMarginRatio) : 0;
+  const breakEvenSalesDaily = Math.round(breakEvenSalesMonthly / 30);
+
+  const marginOfSafetyPercent =
+    totalSales > 0 ? Math.round(((totalSales - breakEvenSalesMonthly) / totalSales) * 1000) / 10 : 0;
+
+  // Unidades estimadas si hay consumo reportado
+  const totalUnits = (metrics?.products || []).reduce((acc, p) => acc + (Number(p.consumption) || 0), 0);
+  const avgTicket = totalUnits > 0 ? Math.round(totalSales / totalUnits) : 0;
+  const breakEvenUnitsMonthly = avgTicket > 0 ? Math.round(breakEvenSalesMonthly / avgTicket) : 0;
+  const breakEvenUnitsDaily = Math.round(breakEvenUnitsMonthly / 30);
+
+  return {
+    totalFixedCosts,
+    fixedOpex,
+    debtService,
+    grossMarginRatio: Math.round(grossMarginRatio * 1000) / 10,
+    breakEvenSalesMonthly,
+    breakEvenSalesDaily,
+    marginOfSafetyPercent,
+    isAboveBreakEven: totalSales >= breakEvenSalesMonthly,
+    avgTicket,
+    totalUnits,
+    breakEvenUnitsMonthly,
+    breakEvenUnitsDaily,
+  };
+}
+
+/**
+ * Genera la proyección financiera a 12 meses con curva de arranque (Ramp-up)
+ * y análisis de liquidez / valle de la muerte.
+ * @param {Object} state - Estado del canvas
+ * @param {Object} options - Parámetros de simulación
+ * @returns {Object} Proyección mes a mes y resumen anual
+ */
+export function calculate12MonthForecast(state, options = {}) {
+  const metrics = calculateBccMetrics(state);
+  const {
+    rampPreset = "gradual", // "gradual" | "fast" | "immediate" | "custom"
+    customRamp = null,
+    postRampMonthlyGrowth = 0.01, // 1% mensual después de alcanzar 100%
+    deductCapexGapAtMonth0 = false,
+  } = options;
+
+  // Curvas de arranque estándar
+  const rampPresets = {
+    gradual: [0.3, 0.5, 0.75, 0.9, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    fast: [0.5, 0.8, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    immediate: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  };
+
+  const rampFactors = customRamp && Array.isArray(customRamp) && customRamp.length === 12
+    ? customRamp
+    : (rampPresets[rampPreset] || rampPresets.gradual);
+
+  const baseSales = metrics.totalProductSales || 0;
+  const baseCogs = metrics.totalCOGS || 0;
+  const cogsRatio = baseSales > 0 ? baseCogs / baseSales : 0;
+  const opexW = metrics.totalW || 0;
+  const debtService = metrics.totalMonthlyDebtService || 0;
+
+  // Caja inicial
+  let runningCash = metrics.totalCashAvailable || 0;
+  if (deductCapexGapAtMonth0 && metrics.fundingSources?.fundingGap > 0) {
+    runningCash = Math.max(0, runningCash - metrics.fundingSources.fundingGap);
+  }
+
+  const initialCash = runningCash;
+  let lowestCash = runningCash;
+  let lowestCashMonth = 0;
+  let breakEvenMonth = null;
+
+  let totalYearRevenue = 0;
+  let totalYearCogs = 0;
+  let totalYearGrossMargin = 0;
+  let totalYearOpex = 0;
+  let totalYearDebtService = 0;
+  let totalYearNetCash = 0;
+
+  const months = [];
+
+  for (let m = 1; m <= 12; m++) {
+    const rampFactor = rampFactors[m - 1] || 1.0;
+    // Crecimiento orgánico adicional una vez se alcanza el 100% de capacidad
+    const postGrowth = rampFactor >= 1.0 && m > 4 ? Math.pow(1 + (Number(postRampMonthlyGrowth) || 0), m - 4) - 1 : 0;
+    const effectiveFactor = rampFactor * (1 + postGrowth);
+
+    const revenue = Math.round(baseSales * effectiveFactor);
+    const cogs = Math.round(revenue * cogsRatio);
+    const grossMargin = revenue - cogs;
+    const operatingProfit = grossMargin - opexW;
+    const netCashFlow = operatingProfit - debtService;
+
+    const cashBefore = runningCash;
+    runningCash = runningCash + netCashFlow;
+
+    if (runningCash < lowestCash) {
+      lowestCash = runningCash;
+      lowestCashMonth = m;
+    }
+
+    if (breakEvenMonth === null && netCashFlow >= 0) {
+      breakEvenMonth = m;
+    }
+
+    totalYearRevenue += revenue;
+    totalYearCogs += cogs;
+    totalYearGrossMargin += grossMargin;
+    totalYearOpex += opexW;
+    totalYearDebtService += debtService;
+    totalYearNetCash += netCashFlow;
+
+    months.push({
+      month: m,
+      monthLabel: `Mes ${m}`,
+      rampPercent: Math.round(effectiveFactor * 100),
+      startingCash: cashBefore,
+      revenue,
+      cogs,
+      grossMargin,
+      opexW,
+      operatingProfit,
+      debtService,
+      netCashFlow,
+      endingCash: runningCash,
+      isNegativeCash: runningCash < 0,
+    });
+  }
+
+  const isCashDeficit = lowestCash < 0;
+  const cashDeficitAmount = isCashDeficit ? Math.abs(lowestCash) : 0;
+
+  return {
+    initialCash,
+    months,
+    summary: {
+      lowestCash,
+      lowestCashMonth,
+      isCashDeficit,
+      cashDeficitAmount,
+      breakEvenMonth: breakEvenMonth || 1,
+      endingYear1Cash: runningCash,
+      totalYearRevenue,
+      totalYearCogs,
+      totalYearGrossMargin,
+      totalYearOpex,
+      totalYearDebtService,
+      totalYearNetCash,
+      overallGrowthYear: baseSales > 0 ? Math.round(((totalYearRevenue / (baseSales * 12)) - 1) * 1000) / 10 : 0,
+    },
   };
 }
