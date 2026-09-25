@@ -3,6 +3,8 @@ import {
   calculateBccMetrics,
   calculateLoanAmortizationSchedule,
   calculateEquityValuation,
+  calculateBreakEvenMetrics,
+  calculate12MonthForecast,
 } from "./finance";
 
 /**
@@ -10,6 +12,8 @@ import {
  */
 export function exportCanvasToExcel(state) {
   const metrics = calculateBccMetrics(state);
+  const breakEven = calculateBreakEvenMetrics(metrics);
+  const forecast = calculate12MonthForecast(state, { rampPreset: "gradual" });
   const wb = XLSX.utils.book_new();
 
   // -------------------------------------------------------------
@@ -39,22 +43,30 @@ export function exportCanvasToExcel(state) {
     [],
     ["Inversión Capex en Activos / Maquinaria (A)", metrics.totalCapexNeeded],
     ["Ventas Proyectadas Mensuales (P1..P9)", metrics.totalProductSales],
-    ["Costos Directos (COGS)", metrics.totalCogs],
-    ["Gastos Operacionales Mensuales (W)", metrics.totalOpexW],
+    ["Costos Directos (COGS)", metrics.totalCOGS],
+    ["Gastos Operacionales Mensuales (W)", metrics.totalW],
     ["Utilidad Operacional Proyectada (EBITDA)", metrics.operatingProfit],
     [],
     ["Servicio de Deuda Total Mensual", metrics.totalMonthlyDebtService],
-    ["- Cuota Financista de Activo [4B]", metrics.monthlyAssetDebtService],
-    ["- Cuota Crédito Bancario [4C]", metrics.monthlyBankDebtService],
+    ["- Cuota Financista de Activo [4B]", metrics.fundingSources?.monthlyAssetPayment || 0],
+    ["- Cuota Crédito Bancario [4C]", metrics.fundingSources?.monthlyBankPayment || 0],
     ["Flujo de Caja Libre Mensual", metrics.netFreeCashFlow],
     ["Ratio de Cobertura de Deuda (DSCR)", metrics.coverageRatio],
-    ["Estado de Viabilidad", metrics.coverageRatio >= 1.25 ? "Saludable (Verde)" : metrics.coverageRatio >= 1.0 ? "Ajustado (Amarillo)" : "Riesgo de Asfixia (Rojo)"],
+    ["Estado de Viabilidad", metrics.statusTitle],
     ["Runway Actual (Meses)", metrics.runwayMonths],
     ["Quemado Neto Mensual (Burn Rate)", metrics.monthlyBurnRate],
+    [],
+    ["3. PUNTO DE EQUILIBRIO (BREAK-EVEN)", ""],
+    ["Costos Fijos Totales (Nómina W + Deuda)", breakEven.totalFixedCosts],
+    ["Margen Bruto de Contribución (%)", `${breakEven.grossMarginRatio}%`],
+    ["Ventas Mínimas de Equilibrio ($/mes)", breakEven.breakEvenSalesMonthly],
+    ["Ventas Mínimas de Equilibrio ($/día)", breakEven.breakEvenSalesDaily],
+    ["Margen de Seguridad Actual (%)", `${breakEven.marginOfSafetyPercent}%`],
+    ["Estado de Equilibrio", breakEven.isAboveBreakEven ? "Superávit sobre equilibrio" : "Déficit bajo punto de equilibrio"],
   ];
 
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-  wsSummary["!cols"] = [{ wch: 42 }, { wch: 25 }, { wch: 20 }, { wch: 15 }];
+  wsSummary["!cols"] = [{ wch: 45 }, { wch: 25 }, { wch: 20 }, { wch: 15 }];
   XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen BCC");
 
   // -------------------------------------------------------------
@@ -77,10 +89,10 @@ export function exportCanvasToExcel(state) {
 
   reqRows.push([
     "TOTAL REQUERIMIENTOS",
-    metrics.totalOpexW,
+    metrics.totalW,
     metrics.totalCapexNeeded,
-    metrics.totalWorkingCapitalNeeded,
-    metrics.totalOpexW + metrics.totalCapexNeeded + metrics.totalWorkingCapitalNeeded,
+    metrics.totalSS,
+    metrics.totalInvestmentNeeded,
   ]);
 
   const wsReq = XLSX.utils.aoa_to_sheet([["DESGLOSE DE REQUERIMIENTOS DE INVERSIÓN [2C]"], [], reqHeaders, ...reqRows]);
@@ -134,12 +146,12 @@ export function exportCanvasToExcel(state) {
     ["Inversionista de Activo / Deuda Privada [4B]", state.fundingSources?.assetInvestorCapital || 0],
     ["Plazo de Retorno (Meses)", state.fundingSources?.assetInvestorTermMonths || 24],
     ["Tasa de Rendimiento Pactada (%)", `${state.fundingSources?.assetInvestorReturnPercent || 15}%`],
-    ["Cuota Mensual Comprometida", metrics.monthlyAssetDebtService],
+    ["Cuota Mensual Comprometida", metrics.fundingSources?.monthlyAssetPayment || 0],
     [],
     ["Crédito Bancario Tradicional [4C]", bankLoan],
     ["Tasa de Interés Efectiva Anual (E.A.)", `${bankRateEA}%`],
     ["Plazo de Amortización (Meses)", bankTermMonths],
-    ["Cuota Fija Mensual (Fórmula Francesa)", metrics.monthlyBankDebtService],
+    ["Cuota Fija Mensual (Fórmula Francesa)", metrics.fundingSources?.monthlyBankPayment || 0],
     [],
     ["TABLA DE AMORTIZACIÓN MENSUAL DEL CRÉDITO BANCARIO [4C]"],
     ["Mes", "Saldo Inicial", "Cuota Fija", "Intereses", "Abono Capital", "Saldo Final"],
@@ -148,14 +160,73 @@ export function exportCanvasToExcel(state) {
       row.startingBalance,
       row.payment,
       row.interest,
-      row.principal,
-      row.endingBalance,
+      row.principalPaid,
+      row.balance,
     ]),
   ];
 
   const wsStack = XLSX.utils.aoa_to_sheet(capitalStackData);
   wsStack["!cols"] = [{ wch: 38 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, wsStack, "Capital Stack & Amortización");
+
+  // -------------------------------------------------------------
+  // 5. HOJA PROYECCIÓN A 12 MESES (RAMP-UP & LIQUIDEZ)
+  // -------------------------------------------------------------
+  const forecastSummary = [
+    ["PROYECCIÓN FINANCIERA Y RAMP-UP DE LIQUIDEZ (12 MESES)"],
+    [],
+    ["Caja Inicial Disponible", forecast.initialCash],
+    ["Punto Mínimo de Caja (Valle de la Muerte)", forecast.summary.lowestCash],
+    ["Mes de Caja Mínima", `Mes ${forecast.summary.lowestCashMonth || 1}`],
+    ["Estado de Liquidez", forecast.summary.isCashDeficit ? `Alerta: Déficit de caja de ${forecast.summary.cashDeficitAmount}` : "Solvente (Sin déficit de caja)"],
+    ["Mes de Equilibrio Operativo", `Mes ${forecast.summary.breakEvenMonth}`],
+    ["Ventas Totales Año 1", forecast.summary.totalYearRevenue],
+    ["Utilidad Operacional (EBITDA) Año 1", forecast.summary.totalYearGrossMargin - forecast.summary.totalYearOpex],
+    ["Servicio de Deuda Total Año 1", forecast.summary.totalYearDebtService],
+    ["Flujo de Caja Neto Año 1", forecast.summary.totalYearNetCash],
+    ["Saldo de Caja al Cierre del Año 1", forecast.summary.endingYear1Cash],
+    [],
+    ["DETALLE MES A MES (RAMP-UP DE VENTAS & FLUJO DE CAJA)"],
+    [
+      "Mes",
+      "% Capacidad",
+      "Saldo Inicial",
+      "Ventas",
+      "COGS",
+      "Margen Bruto",
+      "Nómina (W)",
+      "Servicio Deuda",
+      "Flujo Neto",
+      "Saldo Final Caja",
+    ],
+    ...forecast.months.map((m) => [
+      `Mes ${m.month}`,
+      `${m.rampPercent}%`,
+      m.startingCash,
+      m.revenue,
+      m.cogs,
+      m.grossMargin,
+      m.opexW,
+      m.debtService,
+      m.netCashFlow,
+      m.endingCash,
+    ]),
+  ];
+
+  const wsForecast = XLSX.utils.aoa_to_sheet(forecastSummary);
+  wsForecast["!cols"] = [
+    { wch: 38 },
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+  ];
+  XLSX.utils.book_append_sheet(wb, wsForecast, "Proyección 12 Meses");
 
   // Descargar archivo Excel
   const safeName = (state.name || "simulacion").toLowerCase().replace(/[^a-z0-9]/g, "_");
