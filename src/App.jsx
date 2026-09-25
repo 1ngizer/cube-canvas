@@ -5,6 +5,8 @@ import AiSettingsModal from "./components/AiSettingsModal";
 import StressTestModal from "./components/StressTestModal";
 import WaterfallModal from "./components/WaterfallModal";
 import InvestorPitchModal from "./components/InvestorPitchModal";
+import ForecastModal from "./components/ForecastModal";
+import HelpModal from "./components/HelpModal";
 import { calculateBccMetrics, formatCurrency } from "./utils/finance";
 import { exportCanvasToExcel } from "./utils/excelExport";
 
@@ -147,6 +149,8 @@ export default function App() {
   const [showStressModal, setShowStressModal] = useState(false);
   const [showWaterfallModal, setShowWaterfallModal] = useState(false);
   const [showPitchModal, setShowPitchModal] = useState(false);
+  const [showForecastModal, setShowForecastModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const fileInputRef = useRef(null);
@@ -173,6 +177,51 @@ export default function App() {
     }
     checkAiConfig();
   }, []);
+
+  // Atajos de teclado globales (Ctrl/Cmd + S, E, J, F, ?, Esc)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignorar si el usuario está tipeando en un input, textarea o select
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target?.tagName)) {
+        if (e.key === "Escape") {
+          e.target.blur();
+        }
+        return;
+      }
+
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+
+      if (isCmdOrCtrl && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        setShowSaveModal(true);
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        exportCanvasToExcel(canvasState);
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        handleExportJson();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        setShowForecastModal(true);
+      } else if (e.key === "?" || e.key === "F1") {
+        e.preventDefault();
+        setShowHelpModal(true);
+      } else if (e.key === "Escape") {
+        setShowSaveModal(false);
+        setShowNewModal(false);
+        setShowAiSettingsModal(false);
+        setShowStressModal(false);
+        setShowWaterfallModal(false);
+        setShowPitchModal(false);
+        setShowForecastModal(false);
+        setShowHelpModal(false);
+        setActiveModule(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [canvasState]);
 
   const saveToLocal = (list) => {
     try {
@@ -226,6 +275,31 @@ export default function App() {
     saveToLocal(updated);
     setNewProjectName("");
     setShowNewModal(false);
+  };
+
+  const handleDuplicateScenario = () => {
+    const dup = {
+      ...canvasState,
+      id: `custom_${Date.now()}`,
+      name: `${canvasState.name || "Escenario"} (Copia)`,
+    };
+    const updated = [...savedScenarios, dup];
+    setSavedScenarios(updated);
+    saveToLocal(updated);
+    setCanvasState(dup);
+  };
+
+  const handleDeleteCurrentScenario = () => {
+    if (!canvasState.id.startsWith("custom_") && !canvasState.id.startsWith("imported_")) {
+      alert("⚠️ Los casos de estudio base (Pizzería y Defensivo) son plantillas fijas y no se pueden eliminar.");
+      return;
+    }
+    if (window.confirm(`¿Estás seguro de eliminar el escenario "${canvasState.name}"?`)) {
+      const updated = savedScenarios.filter((s) => s.id !== canvasState.id);
+      setSavedScenarios(updated);
+      saveToLocal(updated);
+      setCanvasState(PRESET_PIZZERIA_CASE);
+    }
   };
 
   const handleExportJson = () => {
@@ -283,7 +357,6 @@ export default function App() {
       {/* BARRA DE HERRAMIENTAS SUPERIOR */}
       <header className="bcc-top-navbar no-print">
         <div className="nav-brand-section">
-          <img src="/favicon.svg" alt="Cube Canvas Logo" className="nav-brand-icon" style={{ width: "24px", height: "24px" }} />
           <div className="ingizer-badge">iNGIZER</div>
           <h1 className="nav-main-title">Business Cube Commands (BCC)</h1>
           <span className="nav-tagline">Growth & Capital Stack Canvas</span>
@@ -361,10 +434,31 @@ export default function App() {
             type="button"
             className="nav-btn btn-save"
             onClick={() => setShowSaveModal(true)}
-            title="Guardar escenario en navegador"
+            title="Guardar escenario en navegador (Ctrl+S)"
           >
             💾 Guardar
           </button>
+
+          <button
+            type="button"
+            className="nav-btn btn-duplicate"
+            onClick={handleDuplicateScenario}
+            title="Duplicar escenario actual para probar otra variante"
+          >
+            📋 Duplicar
+          </button>
+
+          {(canvasState.id.startsWith("custom_") || canvasState.id.startsWith("imported_")) && (
+            <button
+              type="button"
+              className="nav-btn btn-delete"
+              onClick={handleDeleteCurrentScenario}
+              title="Eliminar este escenario personalizado"
+              style={{ backgroundColor: "#fef2f2", borderColor: "#fca5a5", color: "#b91c1c" }}
+            >
+              🗑️
+            </button>
+          )}
 
           <button
             type="button"
@@ -434,6 +528,15 @@ export default function App() {
 
           <button
             type="button"
+            className="nav-btn btn-forecast"
+            onClick={() => setShowForecastModal(true)}
+            title="Proyección financiera a 12 meses: rampa de arranque, punto de equilibrio y análisis de liquidez"
+          >
+            📈 Proyección 12M
+          </button>
+
+          <button
+            type="button"
             className="nav-btn btn-excel"
             onClick={() => exportCanvasToExcel(canvasState)}
             title="Exportar libro completo a Excel (.xlsx) con fórmulas, requerimientos 2C y amortización"
@@ -445,9 +548,18 @@ export default function App() {
             type="button"
             className="nav-btn btn-pdf"
             onClick={handlePrint}
-            title="Exportar canvas a PDF o imprimir"
+            title="Exportar canvas a PDF o imprimir (Ctrl+P)"
           >
             🖨️ PDF
+          </button>
+
+          <button
+            type="button"
+            className="nav-btn btn-help"
+            onClick={() => setShowHelpModal(true)}
+            title="Guía metodológica BCC, glosario y atajos de teclado (?)"
+          >
+            ❓ Ayuda
           </button>
         </div>
       </header>
@@ -557,6 +669,19 @@ export default function App() {
         onClose={() => setShowPitchModal(false)}
         state={canvasState}
         metrics={metrics}
+      />
+
+      {/* MODAL PROYECCIÓN 12 MESES & RAMP-UP */}
+      <ForecastModal
+        isOpen={showForecastModal}
+        onClose={() => setShowForecastModal(false)}
+        state={canvasState}
+      />
+
+      {/* MODAL DE AYUDA Y METODOLOGÍA */}
+      <HelpModal
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
       />
 
       {/* LIENZO PRINCIPAL DEL CANVAS BCC (100VH PANTALLA ÚNICA) */}
