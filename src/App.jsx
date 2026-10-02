@@ -138,9 +138,28 @@ const EMPTY_CANVAS_TEMPLATE = {
 };
 
 const STORAGE_KEY = "bcc_canvas_custom_simulations";
+const DRAFT_STORAGE_KEY = "bcc_canvas_autosave_draft";
+
+function getInitialCanvasState() {
+  if (typeof window !== "undefined") {
+    try {
+      const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (draft) {
+        const parsed = JSON.parse(draft);
+        if (parsed && typeof parsed === "object" && parsed.id && parsed.cashData && parsed.requirements) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("Error leyendo borrador:", e);
+    }
+  }
+  return PRESET_PIZZERIA_CASE;
+}
 
 export default function App() {
-  const [canvasState, setCanvasState] = useState(PRESET_PIZZERIA_CASE);
+  const [canvasState, setCanvasState] = useState(getInitialCanvasState);
+  const [saveStatus, setSaveStatus] = useState("saved"); // 'saving' | 'saved'
   const [activeModule, setActiveModule] = useState(null); // ID del módulo abierto en el drawer
   const [savedScenarios, setSavedScenarios] = useState([]);
   const [scenarioNameInput, setScenarioNameInput] = useState("");
@@ -177,6 +196,34 @@ export default function App() {
     }
     checkAiConfig();
   }, []);
+
+  // Autosave a localStorage con debounce de 600ms
+  useEffect(() => {
+    setSaveStatus("saving");
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(canvasState));
+        setSaveStatus("saved");
+      } catch (e) {
+        console.warn("Error guardando borrador automático:", e);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [canvasState]);
+
+  // Protección ante recarga/cierre accidental: guardar sincrónicamente en localStorage
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(canvasState));
+      } catch (e) {
+        // ignore
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [canvasState]);
 
   // Atajos de teclado globales (Ctrl/Cmd + S, E, J, F, ?, Esc)
   useEffect(() => {
@@ -289,6 +336,20 @@ export default function App() {
     setCanvasState(dup);
   };
 
+  const handleResetToPreset = () => {
+    const isConservative = canvasState.id === "conservative_case";
+    const targetName = isConservative ? "Caso Defensivo" : "Caso Pizzería";
+    if (window.confirm(`¿Deseas restaurar "${targetName}" a sus valores iniciales de fábrica? Se perderán las modificaciones no guardadas en este escenario.`)) {
+      const fresh = isConservative ? PRESET_CONSERVATIVE_CASE : PRESET_PIZZERIA_CASE;
+      setCanvasState(fresh);
+      try {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(fresh));
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
   const handleDeleteCurrentScenario = () => {
     if (!canvasState.id.startsWith("custom_") && !canvasState.id.startsWith("imported_")) {
       alert("⚠️ Los casos de estudio base (Pizzería y Defensivo) son plantillas fijas y no se pueden eliminar.");
@@ -299,6 +360,11 @@ export default function App() {
       setSavedScenarios(updated);
       saveToLocal(updated);
       setCanvasState(PRESET_PIZZERIA_CASE);
+      try {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(PRESET_PIZZERIA_CASE));
+      } catch (e) {
+        // ignore
+      }
     }
   };
 
@@ -429,6 +495,24 @@ export default function App() {
               )}
             </select>
           </div>
+
+          {(canvasState.id === "pizzeria_case" || canvasState.id === "conservative_case") && (
+            <button
+              type="button"
+              className="nav-btn btn-reset"
+              onClick={handleResetToPreset}
+              title="Restablecer plantilla inicial a sus valores de fábrica"
+            >
+              🔄 Restaurar
+            </button>
+          )}
+
+          <span
+            className={`autosave-pill ${saveStatus === "saving" ? "saving" : ""}`}
+            title="Tus cambios se guardan automáticamente en tu navegador"
+          >
+            {saveStatus === "saving" ? "💾 Guardando..." : "✅ Guardado"}
+          </span>
 
           <button
             type="button"

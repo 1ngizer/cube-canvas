@@ -24,9 +24,15 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+  // Security Headers
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -34,8 +40,21 @@ const server = http.createServer((req, res) => {
     return res.end();
   }
 
+  // Reject unsupported HTTP methods
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { 'Content-Type': 'text/plain' });
+    return res.end('Method Not Allowed');
+  }
+
   // Parse path
-  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    return res.end('Bad Request');
+  }
+
   const pathname = decodeURIComponent(parsedUrl.pathname);
 
   // Health check for Railway / Cloud monitoring
@@ -44,8 +63,21 @@ const server = http.createServer((req, res) => {
     return res.end('OK');
   }
 
-  // Normalize file path
-  let filePath = path.join(DIST_DIR, pathname);
+  // Directory traversal check
+  if (pathname.includes('..') || pathname.includes('\\')) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    return res.end('Access Denied');
+  }
+
+  // Normalize file path and resolve within DIST_DIR
+  const safePath = path.normalize(pathname);
+  const filePath = path.join(DIST_DIR, safePath);
+
+  // Ensure resolved path is strictly within DIST_DIR
+  if (!filePath.startsWith(DIST_DIR)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    return res.end('Access Denied');
+  }
 
   // Check if file exists in dist
   fs.stat(filePath, (err, stats) => {
@@ -61,11 +93,20 @@ const server = http.createServer((req, res) => {
       }
 
       res.writeHead(200, { 'Content-Type': contentType });
+      if (req.method === 'HEAD') {
+        return res.end();
+      }
       const stream = fs.createReadStream(filePath);
       return stream.pipe(res);
     }
 
-    // SPA fallback: serve index.html for all client routes
+    // If an asset with extension was requested and not found, return 404
+    if (path.extname(pathname)) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      return res.end('Not Found');
+    }
+
+    // SPA fallback: serve index.html for all client routes without file extensions
     const indexPath = path.join(DIST_DIR, 'index.html');
     fs.readFile(indexPath, (indexErr, content) => {
       if (indexErr) {
@@ -74,6 +115,9 @@ const server = http.createServer((req, res) => {
       }
       res.setHeader('Cache-Control', 'no-cache');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
+      if (req.method === 'HEAD') {
+        return res.end();
+      }
       return res.end(content);
     });
   });
@@ -82,3 +126,4 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Cube Canvas] Servidor activo en puerto ${PORT} (http://localhost:${PORT})`);
 });
+

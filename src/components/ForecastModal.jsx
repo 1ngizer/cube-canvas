@@ -7,19 +7,17 @@ import {
 } from "../utils/finance";
 
 export default function ForecastModal({ isOpen, onClose, state }) {
-  if (!isOpen) return null;
-
   const [rampPreset, setRampPreset] = useState("gradual");
   const [postRampGrowth, setPostRampGrowth] = useState(0.01);
   const [deductCapexGap, setDeductCapexGap] = useState(false);
 
   // Métricas base y punto de equilibrio
-  const metrics = useMemo(() => calculateBccMetrics(state), [state]);
+  const metrics = useMemo(() => calculateBccMetrics(state || {}), [state]);
   const breakEven = useMemo(() => calculateBreakEvenMetrics(metrics), [metrics]);
 
   // Cálculo de proyección a 12 meses
   const forecast = useMemo(() => {
-    return calculate12MonthForecast(state, {
+    return calculate12MonthForecast(state || {}, {
       rampPreset,
       postRampMonthlyGrowth: Number(postRampGrowth),
       deductCapexGapAtMonth0: deductCapexGap,
@@ -30,12 +28,14 @@ export default function ForecastModal({ isOpen, onClose, state }) {
 
   // Escala para el gráfico de barras
   const maxNetFlow = useMemo(() => {
-    const absValues = months.map((m) => Math.abs(m.netCashFlow));
+    const absValues = (months || []).map((m) => Math.abs(m.netCashFlow));
     return Math.max(...absValues, 1000000);
   }, [months]);
 
+  if (!isOpen) return null;
+
   return (
-    <div className="modal-backdrop no-print" onClick={onClose}>
+    <div className="modal-backdrop no-print" onClick={onClose} role="dialog" aria-modal="true">
       <div
         className="modal-content forecast-modal-dialog"
         onClick={(e) => e.stopPropagation()}

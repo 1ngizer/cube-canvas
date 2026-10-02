@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 
 export default function HelpModal({ isOpen, onClose }) {
-  if (!isOpen) return null;
-
   const [activeTab, setActiveTab] = useState("methodology");
 
+  if (!isOpen) return null;
+
   return (
-    <div className="modal-backdrop no-print" onClick={onClose}>
+    <div className="modal-backdrop no-print" onClick={onClose} role="dialog" aria-modal="true">
       <div
         className="modal-content help-modal-dialog"
         onClick={(e) => e.stopPropagation()}
@@ -21,7 +21,7 @@ export default function HelpModal({ isOpen, onClose }) {
               Aprende a interpretar el lienzo de viabilidad de crecimiento y capital stack de iNGIZER.
             </p>
           </div>
-          <button type="button" className="close-btn" onClick={onClose}>
+          <button type="button" className="close-btn" onClick={onClose} aria-label="Cerrar modal">
             ✕
           </button>
         </div>

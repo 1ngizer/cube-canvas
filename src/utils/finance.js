@@ -25,10 +25,11 @@ export function formatCurrency(amount) {
  */
 export function calculateLoanMonthlyPayment(principal, rateEA, months) {
   const p = Number(principal) || 0;
-  const n = Number(months) || 1;
+  const rawMonths = Number(months);
+  if (p <= 0 || isNaN(rawMonths) || rawMonths <= 0) return 0;
+  const n = rawMonths;
   const ea = (Number(rateEA) || 0) / 100;
 
-  if (p <= 0 || n <= 0) return 0;
   if (ea <= 0) return Math.round(p / n);
 
   // Conversión de Tasa Efectiva Anual a Tasa Periódica Mensual
@@ -378,46 +379,6 @@ export function calculateBccMetrics(state) {
   };
 }
 
-// Compatibilidad retroactiva
-export function calculateCashImpact(formData) {
-  const mockState = {
-    cashData: {
-      cashOnHand: formData.initialCash || 0,
-      bankAccounts: 0,
-      platforms: 0,
-      receivables: 0,
-    },
-    products: [
-      { id: "P1", name: "Línea Principal", income: formData.projectedSales || 0 },
-    ],
-    requirements: {
-      production: { w: formData.fixedCosts || 0, a: 0, ss: 0 },
-    },
-    cogsData: {
-      P1: formData.variableCosts || 0,
-    },
-    fundingSources: {
-      bankLoan: formData.debtPayment ? formData.debtPayment * 30 : 0,
-    },
-  };
-  const bcc = calculateBccMetrics(mockState);
-  return {
-    initialCash: formData.initialCash || 0,
-    debtPayment: formData.debtPayment || 0,
-    projectedSales: formData.projectedSales || 0,
-    fixedCosts: formData.fixedCosts || 0,
-    variableCosts: formData.variableCosts || 0,
-    totalOperatingCosts: bcc.totalMonthlyOperatingCosts,
-    operatingCashFlow: bcc.operatingProfit,
-    finalCash: (formData.initialCash || 0) + bcc.operatingProfit - (formData.debtPayment || 0),
-    netCashDelta: bcc.operatingProfit - (formData.debtPayment || 0),
-    operatingMarginPercent: bcc.operatingMarginPercent,
-    status: bcc.status,
-    statusTitle: bcc.statusTitle,
-    statusDesc: bcc.statusDesc,
-    statusIcon: bcc.statusIcon,
-  };
-}
 
 /**
  * Calcula las métricas de Punto de Equilibrio (Break-Even) mensual y diario.
@@ -427,16 +388,25 @@ export function calculateCashImpact(formData) {
 export function calculateBreakEvenMetrics(metrics) {
   const totalSales = metrics?.totalProductSales || 0;
   const totalCogs = metrics?.totalCOGS || 0;
-  const fixedOpex = metrics?.totalW || 0;
+  const fixedW = metrics?.totalW || 0;
+  const fixedSS = metrics?.totalSS || 0;
+  const fixedOpex = fixedW + fixedSS;
   const debtService = metrics?.totalMonthlyDebtService || 0;
   const totalFixedCosts = fixedOpex + debtService;
 
-  const grossMarginRatio = totalSales > 0 ? (totalSales - totalCogs) / totalSales : 0;
+  const grossMargin = totalSales - totalCogs;
+  const grossMarginRatio = totalSales > 0 ? grossMargin / totalSales : 0;
+
+  // Break-even is only possible when gross margin is positive
   const breakEvenSalesMonthly = grossMarginRatio > 0 ? Math.round(totalFixedCosts / grossMarginRatio) : 0;
   const breakEvenSalesDaily = Math.round(breakEvenSalesMonthly / 30);
 
   const marginOfSafetyPercent =
-    totalSales > 0 ? Math.round(((totalSales - breakEvenSalesMonthly) / totalSales) * 1000) / 10 : 0;
+    totalSales > 0 && breakEvenSalesMonthly > 0
+      ? Math.round(((totalSales - breakEvenSalesMonthly) / totalSales) * 1000) / 10
+      : 0;
+
+  const isAboveBreakEven = grossMarginRatio > 0 && totalSales > 0 && totalSales >= breakEvenSalesMonthly;
 
   // Unidades estimadas si hay consumo reportado
   const totalUnits = (metrics?.products || []).reduce((acc, p) => acc + (Number(p.consumption) || 0), 0);
@@ -447,12 +417,14 @@ export function calculateBreakEvenMetrics(metrics) {
   return {
     totalFixedCosts,
     fixedOpex,
+    fixedW,
+    fixedSS,
     debtService,
     grossMarginRatio: Math.round(grossMarginRatio * 1000) / 10,
     breakEvenSalesMonthly,
     breakEvenSalesDaily,
     marginOfSafetyPercent,
-    isAboveBreakEven: totalSales >= breakEvenSalesMonthly,
+    isAboveBreakEven,
     avgTicket,
     totalUnits,
     breakEvenUnitsMonthly,
@@ -491,6 +463,8 @@ export function calculate12MonthForecast(state, options = {}) {
   const baseCogs = metrics.totalCOGS || 0;
   const cogsRatio = baseSales > 0 ? baseCogs / baseSales : 0;
   const opexW = metrics.totalW || 0;
+  const opexSS = metrics.totalSS || 0;
+  const totalMonthlyOpex = opexW + opexSS;
   const debtService = metrics.totalMonthlyDebtService || 0;
 
   // Caja inicial
@@ -522,7 +496,7 @@ export function calculate12MonthForecast(state, options = {}) {
     const revenue = Math.round(baseSales * effectiveFactor);
     const cogs = Math.round(revenue * cogsRatio);
     const grossMargin = revenue - cogs;
-    const operatingProfit = grossMargin - opexW;
+    const operatingProfit = grossMargin - totalMonthlyOpex;
     const netCashFlow = operatingProfit - debtService;
 
     const cashBefore = runningCash;
@@ -540,7 +514,7 @@ export function calculate12MonthForecast(state, options = {}) {
     totalYearRevenue += revenue;
     totalYearCogs += cogs;
     totalYearGrossMargin += grossMargin;
-    totalYearOpex += opexW;
+    totalYearOpex += totalMonthlyOpex;
     totalYearDebtService += debtService;
     totalYearNetCash += netCashFlow;
 
@@ -553,6 +527,8 @@ export function calculate12MonthForecast(state, options = {}) {
       cogs,
       grossMargin,
       opexW,
+      opexSS,
+      totalMonthlyOpex,
       operatingProfit,
       debtService,
       netCashFlow,

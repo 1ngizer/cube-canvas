@@ -7,10 +7,10 @@ export default function StressTestModal({ isOpen, onClose, state, metrics }) {
   if (!isOpen) return null;
 
   const baseSales = metrics.totalProductSales || 0;
-  const baseCogs = metrics.totalCogs || 0;
-  const baseOpex = metrics.totalOpexW || 0;
+  const baseCogs = metrics.totalCOGS || 0;
+  const baseOpex = (metrics.totalW || 0) + (metrics.totalSS || 0);
   const debtService = metrics.totalMonthlyDebtService || 0;
-  const capexNeeded = metrics.totalCapexNeeded || 150000000;
+  const capexNeeded = metrics.totalCapexNeeded ?? 0;
 
   // Cálculos bajo estrés de demanda
   const stressedSales = (baseSales * demandFactor) / 100;

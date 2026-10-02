@@ -187,6 +187,39 @@ html, body {
   background-color: #005a9e;
 }
 
+.btn-reset {
+  background-color: #f8fafc;
+  color: #64748b;
+  border: 1px solid var(--border-light);
+  font-size: 0.72rem;
+}
+.btn-reset:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+  border-color: var(--border-excel);
+}
+
+.autosave-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #047857;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+.autosave-pill.saving {
+  color: #b45309;
+  background-color: #fffbeb;
+  border-color: #fde68a;
+}
+
 /* ÁREA CENTRAL DEL LIENZO */
 .bcc-main-canvas-area {
   flex: 1 1 auto;

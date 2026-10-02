@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import {
   calculateBccMetrics,
   calculateLoanAmortizationSchedule,
@@ -10,7 +9,8 @@ import {
 /**
  * Genera y descarga un libro de Excel (.xlsx) estructurado con el modelo BCC completo.
  */
-export function exportCanvasToExcel(state) {
+export async function exportCanvasToExcel(state) {
+  const XLSX = await import("xlsx");
   const metrics = calculateBccMetrics(state);
   const breakEven = calculateBreakEvenMetrics(metrics);
   const forecast = calculate12MonthForecast(state, { rampPreset: "gradual" });
@@ -44,7 +44,9 @@ export function exportCanvasToExcel(state) {
     ["Inversión Capex en Activos / Maquinaria (A)", metrics.totalCapexNeeded],
     ["Ventas Proyectadas Mensuales (P1..P9)", metrics.totalProductSales],
     ["Costos Directos (COGS)", metrics.totalCOGS],
-    ["Gastos Operacionales Mensuales (W)", metrics.totalW],
+    ["Gastos de Nómina / Trabajo (W)", metrics.totalW],
+    ["Capital de Trabajo e Insumos (SS)", metrics.totalSS],
+    ["Gastos Operacionales Totales (W + SS)", metrics.totalW + metrics.totalSS],
     ["Utilidad Operacional Proyectada (EBITDA)", metrics.operatingProfit],
     [],
     ["Servicio de Deuda Total Mensual", metrics.totalMonthlyDebtService],
@@ -57,7 +59,7 @@ export function exportCanvasToExcel(state) {
     ["Quemado Neto Mensual (Burn Rate)", metrics.monthlyBurnRate],
     [],
     ["3. PUNTO DE EQUILIBRIO (BREAK-EVEN)", ""],
-    ["Costos Fijos Totales (Nómina W + Deuda)", breakEven.totalFixedCosts],
+    ["Costos Fijos Totales (Opex W + SS + Deuda)", breakEven.totalFixedCosts],
     ["Margen Bruto de Contribución (%)", `${breakEven.grossMarginRatio}%`],
     ["Ventas Mínimas de Equilibrio ($/mes)", breakEven.breakEvenSalesMonthly],
     ["Ventas Mínimas de Equilibrio ($/día)", breakEven.breakEvenSalesDaily],

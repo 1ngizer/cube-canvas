@@ -5,12 +5,12 @@ export default function WaterfallModal({ isOpen, onClose, state, metrics }) {
   if (!isOpen) return null;
 
   const sales = metrics.totalProductSales || 0;
-  const cogs = metrics.totalCogs || 0;
+  const cogs = metrics.totalCOGS || 0;
   const grossProfit = sales - cogs;
-  const opexW = metrics.totalOpexW || 0;
+  const opexW = (metrics.totalW || 0) + (metrics.totalSS || 0);
   const operatingProfit = metrics.operatingProfit || 0;
-  const assetDebt = metrics.monthlyAssetDebtService || 0;
-  const bankDebt = metrics.monthlyBankDebtService || 0;
+  const assetDebt = metrics.fundingSources?.monthlyAssetPayment || 0;
+  const bankDebt = metrics.fundingSources?.monthlyBankPayment || 0;
   const totalDebt = metrics.totalMonthlyDebtService || 0;
   const netFreeCash = metrics.netFreeCashFlow || 0;
 

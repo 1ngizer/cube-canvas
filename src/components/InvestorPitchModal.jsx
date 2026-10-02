@@ -6,19 +6,19 @@ export default function InvestorPitchModal({ isOpen, onClose, state, metrics }) 
 
   if (!isOpen) return null;
 
-  const capexNeeded = metrics.totalCapexNeeded || 150000000;
-  const operatingProfit = metrics.operatingProfit || 15000000;
-  const debtService = metrics.totalMonthlyDebtService || 7500000;
-  const dscr = metrics.coverageRatio || 2.0;
-  const sales = metrics.totalProductSales || 38000000;
-  const netFreeCash = metrics.netFreeCashFlow || 8000000;
+  const capexNeeded = metrics.totalCapexNeeded ?? 0;
+  const operatingProfit = metrics.operatingProfit ?? 0;
+  const debtService = metrics.totalMonthlyDebtService ?? 0;
+  const dscr = metrics.coverageRatio ?? 0;
+  const sales = metrics.totalProductSales ?? 0;
+  const netFreeCash = metrics.netFreeCashFlow ?? 0;
 
   const assetDebtTerm = state.fundingSources?.assetInvestorTermMonths || 24;
   const assetDebtReturn = state.fundingSources?.assetInvestorReturnPercent || 15;
-  const assetMonthlyPayment = metrics.monthlyAssetDebtService || (capexNeeded * (1 + assetDebtReturn / 100)) / assetDebtTerm;
+  const assetMonthlyPayment = metrics.fundingSources?.monthlyAssetPayment || (capexNeeded > 0 ? (capexNeeded * (1 + assetDebtReturn / 100)) / assetDebtTerm : 0);
 
-  const equityCapital = state.fundingSources?.equityInvestorCapital || capexNeeded;
-  const equityPct = state.fundingSources?.equityOfferedPercent || 20;
+  const equityCapital = state.fundingSources?.equityInvestorCapital || (capexNeeded > 0 ? capexNeeded : 0);
+  const equityPct = state.fundingSources?.equityOfferedPercent || 0;
   const equityVal = calculateEquityValuation(equityCapital, equityPct);
 
   // Texto para copiar a WhatsApp / Correo
