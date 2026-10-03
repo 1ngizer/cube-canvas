@@ -3012,5 +3012,128 @@ html, body {
   padding: 2px 5px;
 }
 
+/* ========================================================================= */
+/* DISEÑO RESPONSIVO (UI-01): LAPTOPS, TABLETS & MÓVILES                     */
+/* ========================================================================= */
+
+@media (max-width: 1080px), (max-height: 780px) {
+  html, body {
+    height: auto !important;
+    min-height: 100vh;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+  }
+
+  #root {
+    height: auto !important;
+    min-height: 100vh;
+    overflow: visible !important;
+  }
+
+  .bcc-app-container {
+    height: auto !important;
+    min-height: 100vh;
+    overflow: visible !important;
+    padding: 8px 10px;
+    gap: 10px;
+  }
+
+  .bcc-top-navbar {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 44px;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  .nav-actions-section {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .bcc-main-canvas-area {
+    flex: none;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .bcc-canvas-wrapper {
+    height: auto;
+    min-height: 0;
+    gap: 10px;
+    overflow: visible;
+  }
+
+  .bcc-card {
+    flex: none !important;
+    height: auto !important;
+    min-height: 220px;
+  }
+
+  .bridge-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+    gap: 8px;
+  }
+
+  .center-kpi-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .runway-metrics-strip {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .bcc-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .bcc-products-scroll-container {
+    overflow-x: auto;
+  }
+
+  .bcc-footer-note {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    padding: 6px 4px;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 640px) {
+  .nav-brand-section {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .nav-tagline {
+    display: none;
+  }
+
+  .scenario-selector-wrap {
+    width: 100%;
+  }
+
+  .scenario-select {
+    flex: 1;
+  }
+
+  .modal-dialog-box {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 10px auto;
+  }
+
+  .module-drawer-panel {
+    max-width: 100% !important;
+    width: 100vw !important;
+  }
+}
+
+
 
 

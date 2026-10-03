@@ -7,13 +7,16 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null); // { success: boolean, message: string }
+  const [dataConsent, setDataConsent] = useState(false);
 
   useEffect(() => {
     if (isOpen && typeof window !== "undefined") {
       const storedProvider = localStorage.getItem("bcc_ai_provider") || "gemini";
       const storedKey = localStorage.getItem("bcc_ai_api_key") || "";
+      const storedConsent = localStorage.getItem("bcc_ai_data_consent") === "true";
       setProvider(storedProvider);
       setApiKey(storedKey);
+      setDataConsent(storedConsent);
       setTestResult(null);
     }
   }, [isOpen]);
@@ -21,8 +24,17 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
   if (!isOpen) return null;
 
   const handleSave = () => {
+    if (provider !== "local" && !dataConsent) {
+      setTestResult({
+        success: false,
+        message: "⚠️ Debes marcar la casilla de consentimiento de privacidad para enviar cifras a un LLM externo, o seleccionar el 'Motor Heurístico Local' offline.",
+      });
+      return;
+    }
+
     if (typeof window !== "undefined") {
       localStorage.setItem("bcc_ai_provider", provider);
+      localStorage.setItem("bcc_ai_data_consent", String(dataConsent));
       if (provider === "local") {
         localStorage.removeItem("bcc_ai_api_key");
       } else {
@@ -239,6 +251,23 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
         {testResult && (
           <div className={`ai-test-alert ${testResult.success ? "success" : "warning"}`}>
             {testResult.message}
+          </div>
+        )}
+
+        {/* CONSENTIMIENTO INFORMADO DE PRIVACIDAD (SEC-03) */}
+        {provider !== "local" && (
+          <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "10px 12px", marginTop: "10px" }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "0.76rem", color: "#334155", cursor: "pointer", margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={dataConsent}
+                onChange={(e) => setDataConsent(e.target.checked)}
+                style={{ marginTop: "2px" }}
+              />
+              <span>
+                <strong>Acepto compartir las métricas financieras del lienzo con {provider === "gemini" ? "Google Gemini" : "OpenAI"}.</strong> Entiendo que las cifras de ventas, costos, caja y deuda se enviarán en el prompt para generar el diagnóstico financiero.
+              </span>
+            </label>
           </div>
         )}
 

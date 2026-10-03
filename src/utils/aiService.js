@@ -67,6 +67,14 @@ Genera una respuesta ejecutiva, directa, cuantitativa y accionable (máximo 3 p�
  * Consulta a la API de Inteligencia Artificial configurada.
  */
 export async function queryAiCopilot({ provider, apiKey, moduleId, state, metrics, query }) {
+  // Verificación de consentimiento informado de privacidad (SEC-03)
+  if (typeof window !== "undefined" && provider !== "local") {
+    const hasConsent = localStorage.getItem("bcc_ai_data_consent") === "true";
+    if (!hasConsent) {
+      return generateHeuristicFallback(moduleId, state, metrics, query);
+    }
+  }
+
   const prompt = buildFinancialPrompt(moduleId, state, metrics, query);
 
   // Si no hay API key configurada, retorna inmediatamente el motor heurístico

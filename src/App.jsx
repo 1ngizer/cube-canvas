@@ -180,7 +180,8 @@ export default function App() {
     if (typeof window !== "undefined") {
       const p = localStorage.getItem("bcc_ai_provider") || "gemini";
       const k = localStorage.getItem("bcc_ai_api_key") || "";
-      setHasAiKey(p === "local" || !!k.trim());
+      const consent = localStorage.getItem("bcc_ai_data_consent") === "true";
+      setHasAiKey(p === "local" || (!!k.trim() && consent));
     }
   };
 
