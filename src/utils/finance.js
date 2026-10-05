@@ -7,8 +7,37 @@
  * @param {number} amount
  * @returns {string}
  */
-export function formatCurrency(amount) {
-  if (isNaN(amount) || amount === null || amount === undefined) return "$ 0";
+export function formatCurrency(amount, currency = "COP") {
+  if (isNaN(amount) || amount === null || amount === undefined) {
+    if (currency === "USD") return "$ 0 USD";
+    if (currency === "EUR") return "0 €";
+    if (currency === "MXN") return "$ 0 MXN";
+    return "$ 0";
+  }
+
+  const curr = String(currency || "COP").toUpperCase();
+  if (curr === "USD") {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+  if (curr === "EUR") {
+    return new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency: "EUR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+  if (curr === "MXN") {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+
   return new Intl.NumberFormat("es-CO", {
     style: "currency",
     currency: "COP",
@@ -17,43 +46,64 @@ export function formatCurrency(amount) {
 }
 
 /**
- * Calcula la cuota mensual fija de un crédito mediante el sistema de amortización francés.
+ * Calcula la cuota mensual fija de un crédito mediante el sistema de amortización francés,
+ * con soporte opcional para meses de gracia a capital.
  * @param {number} principal - Monto del préstamo
  * @param {number} rateEA - Tasa de interés Efectiva Anual (ej. 20 para 20%)
- * @param {number} months - Plazo en meses (ej. 36)
- * @returns {number} Cuota mensual
+ * @param {number} months - Plazo total en meses (ej. 36)
+ * @param {number} graceMonths - Meses de gracia a capital (ej. 6)
+ * @returns {number} Cuota mensual regular
  */
-export function calculateLoanMonthlyPayment(principal, rateEA, months) {
+export function calculateLoanMonthlyPayment(principal, rateEA, months, graceMonths = 0) {
   const p = Number(principal) || 0;
   const rawMonths = Number(months);
   if (p <= 0 || isNaN(rawMonths) || rawMonths <= 0) return 0;
   const n = rawMonths;
   const ea = (Number(rateEA) || 0) / 100;
+  const grace = Math.min(Math.max(0, Number(graceMonths) || 0), n - 1);
+  const amortizingMonths = Math.max(1, n - grace);
 
-  if (ea <= 0) return Math.round(p / n);
+  if (ea <= 0) return Math.round(p / amortizingMonths);
 
   // Conversión de Tasa Efectiva Anual a Tasa Periódica Mensual
   const i = Math.pow(1 + ea, 1 / 12) - 1;
-  const payment = (p * i) / (1 - Math.pow(1 + i, -n));
+  const payment = (p * i) / (1 - Math.pow(1 + i, -amortizingMonths));
   return Math.round(payment);
 }
 
 /**
- * Genera la tabla de amortización francesa mes a mes.
+ * Calcula el pago mensual únicamente de intereses durante el período de gracia.
+ * @param {number} principal 
+ * @param {number} rateEA 
+ * @returns {number}
+ */
+export function calculateGraceInterestPayment(principal, rateEA) {
+  const p = Number(principal) || 0;
+  const ea = (Number(rateEA) || 0) / 100;
+  if (p <= 0 || ea <= 0) return 0;
+  const i = Math.pow(1 + ea, 1 / 12) - 1;
+  return Math.round(p * i);
+}
+
+/**
+ * Genera la tabla de amortización francesa mes a mes con soporte para período de gracia.
  * @param {number} principal 
  * @param {number} rateEA 
  * @param {number} months 
  * @param {number} maxRows 
- * @returns {Array<{month: number, payment: number, interest: number, principalPaid: number, balance: number}>}
+ * @param {number} graceMonths 
+ * @returns {Array<{month: number, isGrace: boolean, payment: number, interest: number, principalPaid: number, balance: number}>}
  */
-export function calculateLoanAmortizationSchedule(principal, rateEA, months, maxRows = 12) {
+export function calculateLoanAmortizationSchedule(principal, rateEA, months, maxRows = 12, graceMonths = 0) {
   const p = Number(principal) || 0;
   const n = Number(months) || 1;
   const ea = (Number(rateEA) || 0) / 100;
+  const grace = Math.min(Math.max(0, Number(graceMonths) || 0), n - 1);
+  const amortizingMonths = Math.max(1, n - grace);
 
   if (p <= 0 || n <= 0) return [];
   const i = ea > 0 ? Math.pow(1 + ea, 1 / 12) - 1 : 0;
-  const payment = i > 0 ? (p * i) / (1 - Math.pow(1 + i, -n)) : p / n;
+  const regularPayment = i > 0 ? (p * i) / (1 - Math.pow(1 + i, -amortizingMonths)) : p / amortizingMonths;
 
   let balance = p;
   const schedule = [];
@@ -61,11 +111,14 @@ export function calculateLoanAmortizationSchedule(principal, rateEA, months, max
 
   for (let m = 1; m <= totalMonths; m++) {
     const startingBalance = balance;
-    const interest = balance * i;
-    const principalPaid = payment - interest;
+    const isGrace = m <= grace;
+    const interest = Math.round(balance * i);
+    const payment = isGrace ? interest : Math.round(regularPayment);
+    const principalPaid = isGrace ? 0 : Math.min(balance, payment - interest);
     balance = Math.max(0, balance - principalPaid);
     schedule.push({
       month: m,
+      isGrace,
       startingBalance: Math.round(startingBalance),
       payment: Math.round(payment),
       interest: Math.round(interest),
@@ -223,36 +276,49 @@ export function calculateBccMetrics(state) {
     bankLoan = 0, // [4C] Crédito bancario
     bankRateEA = 20, // Tasa bancaria EA %
     bankTermMonths = 36, // Plazo meses
+    bankGraceMonths = 0, // Meses de gracia a capital
     assetInvestorCapital = 0, // [4B] Inversionista que financia el horno/activo
     assetInvestorTermMonths = 24, // Plazo pactado
     assetInvestorReturnPercent = 15, // Retorno anual pactado o margen
+    assetInvestorGraceMonths = 0, // Meses de gracia a capital
     equityInvestorCapital = 0, // [4A] Inversionista de Equity (acciones)
     equityOfferedPercent = 0, // % de la empresa entregado
   } = fundingSources || {};
 
-  // Cuota mensual del crédito bancario
+  // Cuota mensual del crédito bancario (con gracia opcional)
   const monthlyBankPayment = calculateLoanMonthlyPayment(
     bankLoan,
     bankRateEA,
-    bankTermMonths
+    bankTermMonths,
+    bankGraceMonths
   );
 
   // Cuota mensual del inversionista de activo (ej. horno de $150M a 24 meses)
   const monthlyAssetPayment = calculateLoanMonthlyPayment(
     assetInvestorCapital,
     assetInvestorReturnPercent,
-    assetInvestorTermMonths
+    assetInvestorTermMonths,
+    assetInvestorGraceMonths
   );
 
   // Total cuotas mensuales comprometidas por deudas/inversionistas de activo
   const totalMonthlyDebtService = monthlyBankPayment + monthlyAssetPayment;
 
-  // Flujo de Caja Libre Mensual (después de pagar cuotas a financistas)
-  const netFreeCashFlow = operatingProfit - totalMonthlyDebtService;
+  // Provisión de Impuestos (Impuesto de Renta Corporativo sobre Utilidad Operacional)
+  const taxRatePercent = Math.max(0, Number(state?.taxRatePercent || 0));
+  const monthlyTaxProvision = taxRatePercent > 0 && operatingProfit > 0
+    ? Math.round(operatingProfit * (taxRatePercent / 100))
+    : 0;
+  const netProfitAfterTax = operatingProfit - monthlyTaxProvision;
 
-  // Cobertura del Servicio de la Deuda (DSCR)
+  // Flujo de Caja Libre Mensual (después de impuestos y cuotas de deuda)
+  const netFreeCashFlow = netProfitAfterTax - totalMonthlyDebtService;
+
+  // Cobertura del Servicio de la Deuda (DSCR) Pre-tax y Post-tax
   const coverageRatio =
     totalMonthlyDebtService > 0 ? operatingProfit / totalMonthlyDebtService : 99;
+  const coverageRatioPostTax =
+    totalMonthlyDebtService > 0 ? netProfitAfterTax / totalMonthlyDebtService : 99;
 
   // Total fondos levantados
   const totalFundsRaised =
@@ -268,7 +334,7 @@ export function calculateBccMetrics(state) {
   // =========================================================================
   // 5. RUNWAY & BURN RATE [1A / 2A]
   // =========================================================================
-  const monthlyBurnRate = totalMonthlyOperatingCosts + totalMonthlyDebtService;
+  const monthlyBurnRate = totalMonthlyOperatingCosts + totalMonthlyDebtService + monthlyTaxProvision;
   const netMonthlyBurn = monthlyBurnRate - totalProductSales;
   const runwayMonths =
     netMonthlyBurn > 0
@@ -296,9 +362,11 @@ export function calculateBccMetrics(state) {
     status = "danger";
     statusTitle = "Déficit de Cobertura de Deuda (Asfixia de Caja)";
     statusDesc = `La cuota mensual comprometida (${formatCurrency(
-      totalMonthlyDebtService
+      totalMonthlyDebtService,
+      state?.currency || "COP"
     )}) supera la utilidad mensual (${formatCurrency(
-      operatingProfit
+      operatingProfit,
+      state?.currency || "COP"
     )}). Entrarás en mora o agotarás la caja en poco tiempo.`;
     statusIcon = "🔴";
   } else if (coverageRatio < 1.25) {
@@ -351,10 +419,12 @@ export function calculateBccMetrics(state) {
       bankLoan: Number(bankLoan),
       bankRateEA: Number(bankRateEA),
       bankTermMonths: Number(bankTermMonths),
+      bankGraceMonths: Number(bankGraceMonths) || 0,
       monthlyBankPayment,
       assetInvestorCapital: Number(assetInvestorCapital),
       assetInvestorTermMonths: Number(assetInvestorTermMonths),
       assetInvestorReturnPercent: Number(assetInvestorReturnPercent),
+      assetInvestorGraceMonths: Number(assetInvestorGraceMonths) || 0,
       monthlyAssetPayment,
       equityInvestorCapital: Number(equityInvestorCapital),
       equityOfferedPercent: Number(equityOfferedPercent),
@@ -363,9 +433,14 @@ export function calculateBccMetrics(state) {
     },
 
     // 5. Viabilidad y Compromisos
+    currency: state?.currency || "COP",
+    taxRatePercent,
+    monthlyTaxProvision,
+    netProfitAfterTax,
     totalMonthlyDebtService,
     netFreeCashFlow,
     coverageRatio: Math.round(coverageRatio * 100) / 100,
+    coverageRatioPostTax: Math.round(coverageRatioPostTax * 100) / 100,
     monthlyBurnRate,
     netMonthlyBurn,
     runwayMonths: Math.round(runwayMonths * 10) / 10,
@@ -459,6 +534,7 @@ export function calculate12MonthForecast(state, options = {}) {
     ? customRamp
     : (rampPresets[rampPreset] || rampPresets.gradual);
 
+  const taxRatePercent = Math.max(0, Number(options.taxRatePercent ?? state?.taxRatePercent ?? 0));
   const baseSales = metrics.totalProductSales || 0;
   const baseCogs = metrics.totalCOGS || 0;
   const cogsRatio = baseSales > 0 ? baseCogs / baseSales : 0;
@@ -482,6 +558,7 @@ export function calculate12MonthForecast(state, options = {}) {
   let totalYearCogs = 0;
   let totalYearGrossMargin = 0;
   let totalYearOpex = 0;
+  let totalYearTaxes = 0;
   let totalYearDebtService = 0;
   let totalYearNetCash = 0;
 
@@ -497,7 +574,11 @@ export function calculate12MonthForecast(state, options = {}) {
     const cogs = Math.round(revenue * cogsRatio);
     const grossMargin = revenue - cogs;
     const operatingProfit = grossMargin - totalMonthlyOpex;
-    const netCashFlow = operatingProfit - debtService;
+    const taxProvision = taxRatePercent > 0 && operatingProfit > 0
+      ? Math.round(operatingProfit * (taxRatePercent / 100))
+      : 0;
+    const netProfitAfterTax = operatingProfit - taxProvision;
+    const netCashFlow = netProfitAfterTax - debtService;
 
     const cashBefore = runningCash;
     runningCash = runningCash + netCashFlow;
@@ -515,6 +596,7 @@ export function calculate12MonthForecast(state, options = {}) {
     totalYearCogs += cogs;
     totalYearGrossMargin += grossMargin;
     totalYearOpex += totalMonthlyOpex;
+    totalYearTaxes += taxProvision;
     totalYearDebtService += debtService;
     totalYearNetCash += netCashFlow;
 
@@ -530,6 +612,8 @@ export function calculate12MonthForecast(state, options = {}) {
       opexSS,
       totalMonthlyOpex,
       operatingProfit,
+      taxProvision,
+      netProfitAfterTax,
       debtService,
       netCashFlow,
       endingCash: runningCash,
@@ -554,6 +638,7 @@ export function calculate12MonthForecast(state, options = {}) {
       totalYearCogs,
       totalYearGrossMargin,
       totalYearOpex,
+      totalYearTaxes,
       totalYearDebtService,
       totalYearNetCash,
       overallGrowthYear: baseSales > 0 ? Math.round(((totalYearRevenue / (baseSales * 12)) - 1) * 1000) / 10 : 0,

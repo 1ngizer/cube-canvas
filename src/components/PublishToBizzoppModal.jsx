@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { formatCurrency, calculateEquityValuation } from "../utils/finance";
+import { generateShareUrl } from "../services/supabase";
 
 const CATEGORIES = [
   "Gastronomía & Alimentos",
@@ -106,6 +107,7 @@ export default function PublishToBizzoppModal({ isOpen, onClose, state, metrics 
         nsmGoal: state.nsmGoal,
         targetCustomer: state.targetCustomer,
         dscr: `${dscr}x`,
+        cube_canvas_share_url: generateShareUrl(state),
         publishedAt: new Date().toISOString()
       }
     };

@@ -8,6 +8,9 @@ import InvestorPitchModal from "./components/InvestorPitchModal";
 import ForecastModal from "./components/ForecastModal";
 import HelpModal from "./components/HelpModal";
 import PublishToBizzoppModal from "./components/PublishToBizzoppModal";
+import ShareCanvasModal from "./components/ShareCanvasModal";
+import CloudAccountModal from "./components/CloudAccountModal";
+import { decodeShareablePayload } from "./services/supabase";
 import { calculateBccMetrics, formatCurrency } from "./utils/finance";
 import { exportCanvasToExcel } from "./utils/excelExport";
 
@@ -170,6 +173,9 @@ export default function App() {
   const [showWaterfallModal, setShowWaterfallModal] = useState(false);
   const [showPitchModal, setShowPitchModal] = useState(false);
   const [showPublishToBizzoppModal, setShowPublishToBizzoppModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showCloudAccountModal, setShowCloudAccountModal] = useState(false);
+  const [sharedAuditBanner, setSharedAuditBanner] = useState({ active: false, name: "" });
   const [showForecastModal, setShowForecastModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -187,7 +193,7 @@ export default function App() {
     }
   };
 
-  // Cargar simulaciones guardadas de localStorage
+  // Cargar simulaciones guardadas de localStorage y detectar enlace compartido en URL
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -198,7 +204,37 @@ export default function App() {
       console.warn("Error leyendo localStorage:", e);
     }
     checkAiConfig();
+
+    // Detección de escenario compartido en la URL (?share=... o #share=...)
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const shareParam = urlParams.get("share") || window.location.hash.replace(/^#share=/, "");
+      if (shareParam) {
+        const decoded = decodeShareablePayload(shareParam);
+        if (decoded) {
+          setCanvasState(decoded);
+          setSharedAuditBanner({ active: true, name: decoded.name || "Modelo Compartido" });
+        }
+      }
+    }
   }, []);
+
+  const handleCloneShared = () => {
+    const cloned = {
+      ...canvasState,
+      id: `custom_${Date.now()}`,
+      name: `${canvasState.name} (Mi Copia)`,
+    };
+    setCanvasState(cloned);
+    const updated = [cloned, ...savedScenarios];
+    setSavedScenarios(updated);
+    saveToLocal(updated);
+    setSharedAuditBanner({ active: false, name: "" });
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    alert(`✅ Escenario "${cloned.name}" clonado y guardado en tus simulaciones locales.`);
+  };
 
   // Autosave a localStorage con debounce de 600ms
   useEffect(() => {
@@ -621,6 +657,36 @@ export default function App() {
 
           <button
             type="button"
+            className="nav-btn btn-share"
+            onClick={() => setShowShareModal(true)}
+            title="Generar enlace público para que inversionistas o socios puedan auditar este modelo en tiempo real"
+            style={{
+              backgroundColor: "#f0fdf4",
+              borderColor: "#86efac",
+              color: "#166534",
+              fontWeight: "700"
+            }}
+          >
+            🔗 Compartir
+          </button>
+
+          <button
+            type="button"
+            className="nav-btn btn-cloud"
+            onClick={() => setShowCloudAccountModal(true)}
+            title="Sincronizar y respaldar tus escenarios en la nube con Supabase"
+            style={{
+              backgroundColor: "#f8fafc",
+              borderColor: "#cbd5e1",
+              color: "#0f172a",
+              fontWeight: "600"
+            }}
+          >
+            ☁️ Nube / Cuenta
+          </button>
+
+          <button
+            type="button"
             className="nav-btn btn-stress"
             onClick={() => setShowStressModal(true)}
             title="Simulador de estrés: fluctuaciones de demanda, punto de equilibrio y comparador de alternativas de financiación"
@@ -665,6 +731,55 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* BANNER INFORMATIVO CUANDO SE VISUALIZA UN ESCENARIO COMPARTIDO POR URL */}
+      {sharedAuditBanner.active && (
+        <div
+          className="shared-audit-banner no-print"
+          style={{
+            backgroundColor: "#eff6ff",
+            border: "1px solid #93c5fd",
+            borderRadius: "6px",
+            padding: "8px 14px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontSize: "0.88rem",
+            color: "#1e3a8a",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+          }}
+        >
+          <div>
+            👁️ <strong>Modo Auditoría / Inversionista:</strong> Estás visualizando el modelo financiero compartido:{" "}
+            <strong>"{sharedAuditBanner.name}"</strong>.
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleCloneShared}
+              style={{
+                padding: "5px 12px",
+                fontSize: "0.8rem",
+                fontWeight: "700",
+                backgroundColor: "#2563eb",
+                borderColor: "#1d4ed8",
+              }}
+            >
+              📋 Clonar en mis escenarios locales
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setSharedAuditBanner({ active: false, name: "" })}
+              style={{ padding: "5px 8px", fontSize: "0.8rem" }}
+              title="Ocultar aviso"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL GUARDAR SIMULACIÓN */}
       {showSaveModal && (
@@ -783,6 +898,25 @@ export default function App() {
         onClose={() => setShowPublishToBizzoppModal(false)}
         state={canvasState}
         metrics={metrics}
+      />
+
+      {/* MODAL COMPARTIR ESCENARIO PÚBLICO CON INVERSIONISTAS */}
+      <ShareCanvasModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        state={canvasState}
+        metrics={metrics}
+      />
+
+      {/* MODAL DE CUENTA CLOUD Y SINCRONIZACIÓN SUPABASE */}
+      <CloudAccountModal
+        isOpen={showCloudAccountModal}
+        onClose={() => setShowCloudAccountModal(false)}
+        currentCanvas={canvasState}
+        onLoadCanvas={(cloudScenario) => {
+          setCanvasState(cloudScenario);
+          alert(`✅ Escenario "${cloudScenario.name}" cargado desde la nube.`);
+        }}
       />
 
       {/* MODAL PROYECCIÓN 12 MESES & RAMP-UP */}
