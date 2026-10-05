@@ -10,6 +10,9 @@ import HelpModal from "./components/HelpModal";
 import PublishToBizzoppModal from "./components/PublishToBizzoppModal";
 import ShareCanvasModal from "./components/ShareCanvasModal";
 import CloudAccountModal from "./components/CloudAccountModal";
+import BankDossierModal from "./components/BankDossierModal";
+import OnboardingWizardModal from "./components/OnboardingWizardModal";
+import { SECTOR_TEMPLATES } from "./utils/sectorTemplates";
 import { decodeShareablePayload } from "./services/supabase";
 import { calculateBccMetrics, formatCurrency } from "./utils/finance";
 import { exportCanvasToExcel } from "./utils/excelExport";
@@ -177,6 +180,8 @@ export default function App() {
   const [showCloudAccountModal, setShowCloudAccountModal] = useState(false);
   const [sharedAuditBanner, setSharedAuditBanner] = useState({ active: false, name: "" });
   const [showForecastModal, setShowForecastModal] = useState(false);
+  const [showBankDossierModal, setShowBankDossierModal] = useState(false);
+  const [showWizardModal, setShowWizardModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -299,6 +304,11 @@ export default function App() {
         setShowStressModal(false);
         setShowWaterfallModal(false);
         setShowPitchModal(false);
+        setShowPublishToBizzoppModal(false);
+        setShowShareModal(false);
+        setShowCloudAccountModal(false);
+        setShowBankDossierModal(false);
+        setShowWizardModal(false);
         setShowForecastModal(false);
         setShowHelpModal(false);
         setActiveModule(null);
@@ -329,6 +339,11 @@ export default function App() {
     } else if (val === "conservative_case") {
       setCanvasState(PRESET_CONSERVATIVE_CASE);
     } else {
+      const tmpl = SECTOR_TEMPLATES.find((t) => t.id === val);
+      if (tmpl) {
+        setCanvasState(tmpl);
+        return;
+      }
       const found = savedScenarios.find((s) => s.id === val);
       if (found) setCanvasState(found);
     }
@@ -376,6 +391,18 @@ export default function App() {
   };
 
   const handleResetToPreset = () => {
+    const tmpl = SECTOR_TEMPLATES.find((t) => t.id === canvasState.id);
+    if (tmpl) {
+      if (window.confirm(`¿Deseas restaurar "${tmpl.name}" a sus valores de fábrica?`)) {
+        setCanvasState(tmpl);
+        try {
+          localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(tmpl));
+        } catch (e) {
+          // ignore
+        }
+      }
+      return;
+    }
     const isConservative = canvasState.id === "conservative_case";
     const targetName = isConservative ? "Caso Defensivo" : "Caso Pizzería";
     if (window.confirm(`¿Deseas restaurar "${targetName}" a sus valores iniciales de fábrica? Se perderán las modificaciones no guardadas en este escenario.`)) {
@@ -512,6 +539,37 @@ export default function App() {
             ➕ Nuevo
           </button>
 
+          <button
+            type="button"
+            className="nav-btn btn-wizard"
+            onClick={() => setShowWizardModal(true)}
+            title="Asistente interactivo en 4 pasos: configura cualquier modelo de negocio y financiamiento en 5 minutos"
+            style={{
+              backgroundColor: "#fef3c7",
+              borderColor: "#fde047",
+              color: "#854d0e",
+              fontWeight: "700"
+            }}
+          >
+            ⚡ Asistente 5M
+          </button>
+
+          <div className="currency-selector-wrap" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <label style={{ fontSize: "0.72rem", color: "#64748b", fontWeight: 700 }}>Moneda:</label>
+            <select
+              className="scenario-select"
+              style={{ padding: "0.2rem 0.4rem", fontSize: "0.75rem", minWidth: "75px" }}
+              value={canvasState.currency || "COP"}
+              onChange={(e) => setCanvasState({ ...canvasState, currency: e.target.value })}
+              title="Cambiar moneda del canvas (COP, USD, MXN, EUR)"
+            >
+              <option value="COP">COP ($)</option>
+              <option value="USD">USD ($)</option>
+              <option value="MXN">MXN ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+
           <div className="scenario-selector-wrap">
             <label>Escenario:</label>
             <select
@@ -519,9 +577,16 @@ export default function App() {
               value={canvasState.id}
               onChange={handleSelectScenario}
             >
-              <optgroup label="Casos de Estudio">
-                <option value="pizzeria_case">🍕 Caso Pizzería (Horno $150M)</option>
-                <option value="conservative_case">🛡️ Caso Defensivo (Crédito Menor)</option>
+              <optgroup label="Plantillas Sectoriales Reales">
+                {SECTOR_TEMPLATES.map((tmpl) => (
+                  <option key={tmpl.id} value={tmpl.id}>
+                    {tmpl.name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Casos Base">
+                <option value="pizzeria_case">🍕 Caso Pizzería Base</option>
+                <option value="conservative_case">🛡️ Caso Defensivo Base</option>
               </optgroup>
               {savedScenarios.length > 0 && (
                 <optgroup label="Mis Simulaciones">
@@ -535,7 +600,7 @@ export default function App() {
             </select>
           </div>
 
-          {(canvasState.id === "pizzeria_case" || canvasState.id === "conservative_case") && (
+          {(canvasState.id === "pizzeria_case" || canvasState.id === "conservative_case" || SECTOR_TEMPLATES.some((t) => t.id === canvasState.id)) && (
             <button
               type="button"
               className="nav-btn btn-reset"
@@ -638,6 +703,21 @@ export default function App() {
             title="Ficha ejecutiva y One-Pager para comités de crédito, bancos e inversionistas"
           >
             🎯 One-Pager
+          </button>
+
+          <button
+            type="button"
+            className="nav-btn btn-bank-dossier"
+            onClick={() => setShowBankDossierModal(true)}
+            title="Generar Expediente Oficial de Crédito para Comités Bancarios y de Riesgo (DSCR, Amortización con Gracia, Garantías)"
+            style={{
+              backgroundColor: "#1e293b",
+              borderColor: "#0f172a",
+              color: "#f8fafc",
+              fontWeight: "700"
+            }}
+          >
+            📑 Dossier Bancario
           </button>
 
           <button
@@ -916,6 +996,27 @@ export default function App() {
         onLoadCanvas={(cloudScenario) => {
           setCanvasState(cloudScenario);
           alert(`✅ Escenario "${cloudScenario.name}" cargado desde la nube.`);
+        }}
+      />
+
+      {/* MODAL DOSSIER BANCARIO & RIESGO DE CRÉDITO */}
+      <BankDossierModal
+        isOpen={showBankDossierModal}
+        onClose={() => setShowBankDossierModal(false)}
+        state={canvasState}
+        metrics={metrics}
+      />
+
+      {/* MODAL ASISTENTE DE CREACIÓN RÁPIDA 5 MINUTOS */}
+      <OnboardingWizardModal
+        isOpen={showWizardModal}
+        onClose={() => setShowWizardModal(false)}
+        onComplete={(newCanvas) => {
+          setCanvasState(newCanvas);
+          const updated = [newCanvas, ...savedScenarios];
+          setSavedScenarios(updated);
+          saveToLocal(updated);
+          setShowWizardModal(false);
         }}
       />
 
