@@ -7,6 +7,7 @@ import WaterfallModal from "./components/WaterfallModal";
 import InvestorPitchModal from "./components/InvestorPitchModal";
 import ForecastModal from "./components/ForecastModal";
 import HelpModal from "./components/HelpModal";
+import PublishToBizzoppModal from "./components/PublishToBizzoppModal";
 import { calculateBccMetrics, formatCurrency } from "./utils/finance";
 import { exportCanvasToExcel } from "./utils/excelExport";
 
@@ -168,6 +169,7 @@ export default function App() {
   const [showStressModal, setShowStressModal] = useState(false);
   const [showWaterfallModal, setShowWaterfallModal] = useState(false);
   const [showPitchModal, setShowPitchModal] = useState(false);
+  const [showPublishToBizzoppModal, setShowPublishToBizzoppModal] = useState(false);
   const [showForecastModal, setShowForecastModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -604,6 +606,21 @@ export default function App() {
 
           <button
             type="button"
+            className="nav-btn btn-publish-bizzopp"
+            onClick={() => setShowPublishToBizzoppModal(true)}
+            title="Publicar esta oportunidad estructurada directamente en el Social Feed de Bizzopp"
+            style={{
+              backgroundColor: "#059669",
+              borderColor: "#047857",
+              color: "#ffffff",
+              fontWeight: "700"
+            }}
+          >
+            🚀 Publicar en Bizzopp
+          </button>
+
+          <button
+            type="button"
             className="nav-btn btn-stress"
             onClick={() => setShowStressModal(true)}
             title="Simulador de estrés: fluctuaciones de demanda, punto de equilibrio y comparador de alternativas de financiación"
@@ -752,6 +769,18 @@ export default function App() {
       <InvestorPitchModal
         isOpen={showPitchModal}
         onClose={() => setShowPitchModal(false)}
+        state={canvasState}
+        metrics={metrics}
+        onOpenPublishToBizzopp={() => {
+          setShowPitchModal(false);
+          setShowPublishToBizzoppModal(true);
+        }}
+      />
+
+      {/* MODAL DE PUBLICACIÓN EN BIZZOPP SOCIAL FEED */}
+      <PublishToBizzoppModal
+        isOpen={showPublishToBizzoppModal}
+        onClose={() => setShowPublishToBizzoppModal(false)}
         state={canvasState}
         metrics={metrics}
       />

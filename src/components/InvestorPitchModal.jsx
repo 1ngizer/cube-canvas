@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { formatCurrency, calculateEquityValuation } from "../utils/finance";
 
-export default function InvestorPitchModal({ isOpen, onClose, state, metrics }) {
+export default function InvestorPitchModal({ isOpen, onClose, state, metrics, onOpenPublishToBizzopp }) {
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
@@ -198,6 +198,24 @@ Generado con Cube Canvas (BCC) ® • iNGIZER Capital Stack Engine`;
           >
             🖨️ Imprimir One-Pager
           </button>
+          {onOpenPublishToBizzopp && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onOpenPublishToBizzopp}
+              style={{
+                backgroundColor: "#059669",
+                borderColor: "#047857",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                fontWeight: "700"
+              }}
+              title="Publicar esta oportunidad estructurada en la red social Bizzopp"
+            >
+              🚀 Publicar en Bizzopp Feed
+            </button>
+          )}
           <div style={{ flex: 1 }} />
           <button type="button" className="btn btn-secondary" onClick={onClose}>
             Cerrar
