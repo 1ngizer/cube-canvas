@@ -25,7 +25,7 @@ const MIME_TYPES = {
 
 const server = http.createServer((req, res) => {
   // Security Headers
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://ingizer.com https://*.ingizer.com https://*.railway.app;");
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

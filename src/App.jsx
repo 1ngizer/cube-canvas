@@ -12,6 +12,7 @@ import ShareCanvasModal from "./components/ShareCanvasModal";
 import CloudAccountModal from "./components/CloudAccountModal";
 import BankDossierModal from "./components/BankDossierModal";
 import OnboardingWizardModal from "./components/OnboardingWizardModal";
+import UserProjectsDashboard from "./components/UserProjectsDashboard";
 import { SECTOR_TEMPLATES } from "./utils/sectorTemplates";
 import { decodeShareablePayload } from "./services/supabase";
 import { calculateBccMetrics, formatCurrency } from "./utils/finance";
@@ -178,6 +179,7 @@ export default function App() {
   const [showPublishToBizzoppModal, setShowPublishToBizzoppModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showCloudAccountModal, setShowCloudAccountModal] = useState(false);
+  const [showProjectsDashboard, setShowProjectsDashboard] = useState(false);
   const [sharedAuditBanner, setSharedAuditBanner] = useState({ active: false, name: "" });
   const [showForecastModal, setShowForecastModal] = useState(false);
   const [showBankDossierModal, setShowBankDossierModal] = useState(false);
@@ -307,6 +309,7 @@ export default function App() {
         setShowPublishToBizzoppModal(false);
         setShowShareModal(false);
         setShowCloudAccountModal(false);
+        setShowProjectsDashboard(false);
         setShowBankDossierModal(false);
         setShowWizardModal(false);
         setShowForecastModal(false);
@@ -491,7 +494,43 @@ export default function App() {
         <div className="nav-brand-section">
           <div className="ingizer-badge">iNGIZER</div>
           <h1 className="nav-main-title">Business Cube Commands (BCC)</h1>
-          <span className="nav-tagline">Growth & Capital Stack Canvas</span>
+          <span className="nav-tagline">Growth &amp; Capital Stack Canvas</span>
+
+          <button
+            type="button"
+            className="nav-btn btn-user-panel"
+            onClick={() => setShowProjectsDashboard(true)}
+            title="Panel de Proyectos &amp; Portafolio de Inversión iNGIZER (Mis Proyectos en la Nube)"
+            style={{
+              backgroundColor: "#0f172a",
+              color: "#ffffff",
+              border: "1px solid #334155",
+              fontWeight: "700",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "0.3rem 0.75rem",
+              borderRadius: "6px",
+              cursor: "pointer",
+              marginLeft: "10px",
+            }}
+          >
+            📁 Mis Proyectos
+            {savedScenarios.length > 0 && (
+              <span
+                style={{
+                  backgroundColor: "#10b981",
+                  color: "#0f172a",
+                  fontSize: "0.68rem",
+                  padding: "1px 6px",
+                  borderRadius: "10px",
+                  fontWeight: "800",
+                }}
+              >
+                {savedScenarios.length}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="nav-actions-section">
@@ -753,8 +792,8 @@ export default function App() {
           <button
             type="button"
             className="nav-btn btn-cloud"
-            onClick={() => setShowCloudAccountModal(true)}
-            title="Sincronizar y respaldar tus escenarios en la nube con Supabase"
+            onClick={() => setShowProjectsDashboard(true)}
+            title="Panel de Proyectos & Portafolio iNGIZER en la Nube (Supabase)"
             style={{
               backgroundColor: "#f8fafc",
               borderColor: "#cbd5e1",
@@ -762,7 +801,7 @@ export default function App() {
               fontWeight: "600"
             }}
           >
-            ☁️ Nube / Cuenta
+            ☁️ Nube / Portafolio
           </button>
 
           <button
@@ -986,6 +1025,29 @@ export default function App() {
         onClose={() => setShowShareModal(false)}
         state={canvasState}
         metrics={metrics}
+      />
+
+      {/* PANEL DE USUARIO & PORTAFOLIO DE PROYECTOS iNGIZER */}
+      <UserProjectsDashboard
+        isOpen={showProjectsDashboard}
+        onClose={() => setShowProjectsDashboard(false)}
+        currentCanvas={canvasState}
+        onSelectCanvas={(newCanvas) => {
+          setCanvasState(newCanvas);
+          const updated = [newCanvas, ...savedScenarios.filter((s) => s.id !== newCanvas.id)];
+          setSavedScenarios(updated);
+          saveToLocal(updated);
+        }}
+        onOpenNewProject={() => setShowNewModal(true)}
+        onOpenWizard={() => setShowWizardModal(true)}
+        onOpenDossier={(c) => {
+          if (c) setCanvasState(c);
+          setShowBankDossierModal(true);
+        }}
+        onOpenPublish={(c) => {
+          if (c) setCanvasState(c);
+          setShowPublishToBizzoppModal(true);
+        }}
       />
 
       {/* MODAL DE CUENTA CLOUD Y SINCRONIZACIÓN SUPABASE */}

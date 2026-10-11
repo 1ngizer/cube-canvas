@@ -99,49 +99,126 @@ export function generateShareUrl(canvasObj) {
 // =========================================================================
 
 /**
- * Guarda un escenario en la nube para el usuario autenticado.
+ * Obtiene el perfil de usuario extendido (consultando tabla profiles o metadata).
  */
-export async function saveCanvasToCloud(canvasState) {
+export async function getUserProfile() {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return null;
+
+    let companyName = user.user_metadata?.company_name || "";
+    let fullName = user.user_metadata?.full_name || user.user_metadata?.name || "";
+
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profile) {
+        companyName = profile.company_name || companyName;
+        fullName = profile.full_name || fullName;
+        return {
+          ...user,
+          profile: {
+            ...profile,
+            company_name: companyName,
+            full_name: fullName,
+          },
+        };
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    return {
+      ...user,
+      profile: {
+        id: user.id,
+        email: user.email,
+        company_name: companyName || "Mi Empresa Pyme",
+        full_name: fullName || user.email?.split("@")[0] || "Usuario iNGIZER",
+      },
+    };
+  } catch (err) {
+    console.warn("Error obteniendo perfil:", err);
+    return null;
+  }
+}
+
+/**
+ * Guarda un escenario en la nube para el usuario autenticado con soporte relacional y metadata.
+ */
+export async function saveCanvasToCloud(canvasState, calculatedMetrics = null) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("Debes iniciar sesión para sincronizar escenarios en la nube.");
+    throw new Error("Debes iniciar sesión con tu cuenta iNGIZER para sincronizar escenarios en la nube.");
   }
 
-  const existingCanvases = user.user_metadata?.canvases || [];
+  const scenarioId = canvasState.id || `cloud_${Date.now()}`;
+  const projectName = canvasState.name || "Nuevo Lienzo";
+  const currency = canvasState.currency || "COP";
+  const sector = canvasState.sector || "General";
+  const now = new Date().toISOString();
+
+  const capexNeeded = calculatedMetrics?.totalCapexNeeded ?? 0;
+  const operatingProfit = calculatedMetrics?.operatingProfit ?? 0;
+  const dscrRatio = calculatedMetrics?.coverageRatio ?? 0;
+  const dscrPostTax = calculatedMetrics?.coverageRatioPostTax ?? dscrRatio;
+  const viabilityStatus = calculatedMetrics?.status ?? "healthy";
+
   const scenarioToSave = {
     ...canvasState,
-    id: canvasState.id || `cloud_${Date.now()}`,
-    updatedAt: new Date().toISOString(),
+    id: scenarioId,
+    name: projectName,
+    currency,
+    sector,
+    capexNeeded,
+    operatingProfit,
+    dscrRatio,
+    dscrPostTax,
+    viabilityStatus,
+    updatedAt: now,
   };
 
-  const filtered = existingCanvases.filter((c) => c.id !== scenarioToSave.id);
-  const updatedCanvases = [scenarioToSave, ...filtered].slice(0, 30); // Guardar hasta 30 escenarios
+  // 1. Guardar en user_metadata como respaldo ultra-resiliente
+  const existingCanvases = user.user_metadata?.canvases || [];
+  const filtered = existingCanvases.filter((c) => c.id !== scenarioId);
+  const updatedCanvases = [scenarioToSave, ...filtered].slice(0, 50);
 
-  const { error } = await supabase.auth.updateUser({
+  await supabase.auth.updateUser({
     data: {
       canvases: updatedCanvases,
-      lastActiveScenarioId: scenarioToSave.id,
+      lastActiveScenarioId: scenarioId,
     },
   });
 
-  if (error) {
-    throw error;
-  }
-
-  // Opcional: intentar guardar también en tabla relacional si existe
+  // 2. Guardar en tabla relacional cube_canvases si está migrada
   try {
     await supabase.from("cube_canvases").upsert({
-      id: scenarioToSave.id,
-      title: scenarioToSave.name,
-      data: scenarioToSave,
-      created_by: user.id,
-      updated_at: new Date().toISOString(),
+      id: scenarioId,
+      user_id: user.id,
+      company_name: user.user_metadata?.company_name || projectName,
+      project_name: projectName,
+      currency,
+      sector,
+      capex_needed: capexNeeded,
+      operating_profit: operatingProfit,
+      dscr_ratio: dscrRatio,
+      dscr_post_tax: dscrPostTax,
+      viability_status: viabilityStatus,
+      canvas_state: scenarioToSave,
+      updated_at: now,
     });
   } catch (tableErr) {
-    // Si la tabla no está creada aún en la base de datos, el perfil de usuario ya lo preservó
+    console.debug("cube_canvases tabla opcional:", tableErr?.message);
   }
 
   return scenarioToSave;
@@ -157,19 +234,19 @@ export async function getCloudCanvases() {
 
   if (!user) return [];
 
-  // 1. Obtener desde user_metadata (siempre disponible sin migraciones)
+  // 1. Obtener desde user_metadata
   const metaCanvases = user.user_metadata?.canvases || [];
 
-  // 2. Intentar combinar con tabla relacional si está activa
+  // 2. Intentar consultar tabla relacional cube_canvases
   try {
     const { data, error } = await supabase
       .from("cube_canvases")
-      .select("data")
+      .select("canvas_state, updated_at")
+      .eq("user_id", user.id)
       .order("updated_at", { ascending: false });
 
     if (!error && Array.isArray(data) && data.length > 0) {
-      const dbCanvases = data.map((d) => d.data);
-      // Unir evitando duplicados
+      const dbCanvases = data.map((d) => d.canvas_state).filter(Boolean);
       const seenIds = new Set(dbCanvases.map((c) => c.id));
       const combined = [...dbCanvases, ...metaCanvases.filter((c) => !seenIds.has(c.id))];
       return combined;
@@ -199,8 +276,21 @@ export async function deleteCloudCanvas(scenarioId) {
   });
 
   try {
-    await supabase.from("cube_canvases").delete().eq("id", scenarioId);
+    await supabase.from("cube_canvases").delete().eq("id", scenarioId).eq("user_id", user.id);
   } catch (e) {
     // ignore
   }
+}
+
+/**
+ * Duplica un escenario en la nube.
+ */
+export async function duplicateCloudCanvas(originalCanvas) {
+  const newCanvas = {
+    ...originalCanvas,
+    id: `custom_${Date.now()}`,
+    name: `${originalCanvas.name || "Proyecto"} (Copia)`,
+    updatedAt: new Date().toISOString(),
+  };
+  return saveCanvasToCloud(newCanvas);
 }
