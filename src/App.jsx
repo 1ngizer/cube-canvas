@@ -189,6 +189,23 @@ export default function App() {
   const [newProjectName, setNewProjectName] = useState("");
   const fileInputRef = useRef(null);
   const [hasAiKey, setHasAiKey] = useState(false);
+  const [navDropdown, setNavDropdown] = useState(null); // 'simulators' | 'export' | null
+  const navDropdownRef = useRef(null);
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (navDropdownRef.current && !navDropdownRef.current.contains(e.target)) {
+        setNavDropdown(null);
+      }
+    };
+    if (navDropdown) {
+      document.addEventListener("mousedown", handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [navDropdown]);
 
   // Comprobar estado de configuración de IA
   const checkAiConfig = () => {
@@ -315,6 +332,7 @@ export default function App() {
         setShowForecastModal(false);
         setShowHelpModal(false);
         setActiveModule(null);
+        setNavDropdown(null);
       }
     };
 
@@ -533,7 +551,7 @@ export default function App() {
           </button>
         </div>
 
-        <div className="nav-actions-section">
+        <div className="nav-actions-section" ref={navDropdownRef}>
           {/* ACCESO RÁPIDO A MÓDULOS DE ENTRADA (1A..4C) */}
           <div className="nav-modules-dropdown-wrap">
             <select
@@ -568,30 +586,6 @@ export default function App() {
               </optgroup>
             </select>
           </div>
-
-          <button
-            type="button"
-            className="nav-btn btn-new"
-            onClick={() => setShowNewModal(true)}
-            title="Crear un nuevo proyecto o lienzo en blanco"
-          >
-            ➕ Nuevo
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-wizard"
-            onClick={() => setShowWizardModal(true)}
-            title="Asistente interactivo en 4 pasos: configura cualquier modelo de negocio y financiamiento en 5 minutos"
-            style={{
-              backgroundColor: "#fef3c7",
-              borderColor: "#fde047",
-              color: "#854d0e",
-              fontWeight: "700"
-            }}
-          >
-            ⚡ Asistente 5M
-          </button>
 
           <div className="currency-selector-wrap" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
             <label style={{ fontSize: "0.72rem", color: "#64748b", fontWeight: 700 }}>Moneda:</label>
@@ -639,23 +633,29 @@ export default function App() {
             </select>
           </div>
 
-          {(canvasState.id === "pizzeria_case" || canvasState.id === "conservative_case" || SECTOR_TEMPLATES.some((t) => t.id === canvasState.id)) && (
-            <button
-              type="button"
-              className="nav-btn btn-reset"
-              onClick={handleResetToPreset}
-              title="Restablecer plantilla inicial a sus valores de fábrica"
-            >
-              🔄 Restaurar
-            </button>
-          )}
-
-          <span
-            className={`autosave-pill ${saveStatus === "saving" ? "saving" : ""}`}
-            title="Tus cambios se guardan automáticamente en tu navegador"
+          <button
+            type="button"
+            className="nav-btn btn-new"
+            onClick={() => setShowNewModal(true)}
+            title="Crear un nuevo proyecto o lienzo en blanco"
           >
-            {saveStatus === "saving" ? "💾 Guardando..." : "✅ Guardado"}
-          </span>
+            ➕ Nuevo
+          </button>
+
+          <button
+            type="button"
+            className="nav-btn btn-wizard"
+            onClick={() => setShowWizardModal(true)}
+            title="Asistente interactivo en 4 pasos: configura cualquier modelo de negocio y financiamiento en 5 minutos"
+            style={{
+              backgroundColor: "#fef3c7",
+              borderColor: "#fde047",
+              color: "#854d0e",
+              fontWeight: "700"
+            }}
+          >
+            ⚡ Asistente 5M
+          </button>
 
           <button
             type="button"
@@ -666,44 +666,232 @@ export default function App() {
             💾 Guardar
           </button>
 
-          <button
-            type="button"
-            className="nav-btn btn-duplicate"
-            onClick={handleDuplicateScenario}
-            title="Duplicar escenario actual para probar otra variante"
+          <span
+            className={`autosave-pill ${saveStatus === "saving" ? "saving" : ""}`}
+            title="Tus cambios se guardan automáticamente en tu navegador"
           >
-            📋 Duplicar
-          </button>
+            {saveStatus === "saving" ? "💾 Guardando..." : "✅ Guardado"}
+          </span>
 
-          {(canvasState.id.startsWith("custom_") || canvasState.id.startsWith("imported_")) && (
+          {/* DROPDOWN 1: SIMULADORES FINANCIEROS */}
+          <div className="nav-dropdown-wrap">
             <button
               type="button"
-              className="nav-btn btn-delete"
-              onClick={handleDeleteCurrentScenario}
-              title="Eliminar este escenario personalizado"
-              style={{ backgroundColor: "#fef2f2", borderColor: "#fca5a5", color: "#b91c1c" }}
+              className={`nav-dropdown-btn ${navDropdown === "simulators" ? "active" : ""}`}
+              onClick={() => setNavDropdown(navDropdown === "simulators" ? null : "simulators")}
+              title="Simuladores y análisis financiero avanzado"
             >
-              🗑️
+              📊 Simuladores <span className="nav-dropdown-arrow">▼</span>
             </button>
-          )}
+            {navDropdown === "simulators" && (
+              <div className="nav-dropdown-menu">
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    setShowStressModal(true);
+                  }}
+                >
+                  <span className="item-icon">⚡</span>
+                  <div className="item-content">
+                    <span className="item-title">Test de Sensibilidad &amp; Estrés</span>
+                    <span className="item-desc">Fluctuación de demanda, punto de equilibrio y riesgo</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    setShowWaterfallModal(true);
+                  }}
+                >
+                  <span className="item-icon">🌊</span>
+                  <div className="item-content">
+                    <span className="item-title">Flujo de Caja en Cascada</span>
+                    <span className="item-desc">Ventas → Costos → Utilidad → Deuda → Caja Libre</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    setShowForecastModal(true);
+                  }}
+                >
+                  <span className="item-icon">📈</span>
+                  <div className="item-content">
+                    <span className="item-title">Proyección a 12 Meses</span>
+                    <span className="item-desc">Curva de arranque, valle de la muerte y TIR/VAN</span>
+                  </div>
+                </button>
+                <div className="nav-dropdown-divider" />
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    setShowPitchModal(true);
+                  }}
+                >
+                  <span className="item-icon">🎯</span>
+                  <div className="item-content">
+                    <span className="item-title">One-Pager Inversionista</span>
+                    <span className="item-desc">Ficha ejecutiva y resumen para comités de crédito</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    setShowBankDossierModal(true);
+                  }}
+                >
+                  <span className="item-icon">📑</span>
+                  <div className="item-content">
+                    <span className="item-title">Dossier Bancario Oficial</span>
+                    <span className="item-desc">Expediente formal para comités de crédito y riesgo</span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
 
-          <button
-            type="button"
-            className="nav-btn btn-io"
-            onClick={handleExportJson}
-            title="Exportar simulación completa como archivo JSON"
-          >
-            📥 Exportar
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-io"
-            onClick={handleImportClick}
-            title="Importar simulación desde archivo JSON"
-          >
-            📤 Importar
-          </button>
+          {/* DROPDOWN 2: EXPORTAR & CONECTAR */}
+          <div className="nav-dropdown-wrap">
+            <button
+              type="button"
+              className={`nav-dropdown-btn ${navDropdown === "export" ? "active" : ""}`}
+              onClick={() => setNavDropdown(navDropdown === "export" ? null : "export")}
+              title="Exportar reportes y conectar con el ecosistema"
+            >
+              📤 Exportar &amp; Conectar <span className="nav-dropdown-arrow">▼</span>
+            </button>
+            {navDropdown === "export" && (
+              <div className="nav-dropdown-menu">
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    exportCanvasToExcel(canvasState);
+                  }}
+                >
+                  <span className="item-icon">📊</span>
+                  <div className="item-content">
+                    <span className="item-title">Libro de Excel (.xlsx)</span>
+                    <span className="item-desc">3 hojas completas con fórmulas dinámicas y amortización</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    handlePrint();
+                  }}
+                >
+                  <span className="item-icon">🖨️</span>
+                  <div className="item-content">
+                    <span className="item-title">Imprimir / Guardar en PDF</span>
+                    <span className="item-desc">Vista de presentación formateada para comité</span>
+                  </div>
+                </button>
+                <div className="nav-dropdown-divider" />
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    setShowPublishToBizzoppModal(true);
+                  }}
+                >
+                  <span className="item-icon">🚀</span>
+                  <div className="item-content">
+                    <span className="item-title">Publicar en Bizzopp</span>
+                    <span className="item-desc">Conectar con red de inversionistas y búsqueda de capital</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    setShowShareModal(true);
+                  }}
+                >
+                  <span className="item-icon">🔗</span>
+                  <div className="item-content">
+                    <span className="item-title">Compartir Enlace Público</span>
+                    <span className="item-desc">Enlace para que socios auditen el modelo en tiempo real</span>
+                  </div>
+                </button>
+                <div className="nav-dropdown-divider" />
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    handleDuplicateScenario();
+                  }}
+                >
+                  <span className="item-icon">📋</span>
+                  <div className="item-content">
+                    <span className="item-title">Duplicar Escenario</span>
+                    <span className="item-desc">Crear una copia editable para probar otra variante</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    handleExportJson();
+                  }}
+                >
+                  <span className="item-icon">📥</span>
+                  <div className="item-content">
+                    <span className="item-title">Descargar Archivo JSON</span>
+                    <span className="item-desc">Copia de seguridad local estructurada</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="nav-dropdown-item"
+                  onClick={() => {
+                    setNavDropdown(null);
+                    handleImportClick();
+                  }}
+                >
+                  <span className="item-icon">📤</span>
+                  <div className="item-content">
+                    <span className="item-title">Importar Archivo JSON</span>
+                    <span className="item-desc">Cargar un escenario desde archivo local</span>
+                  </div>
+                </button>
+                {(canvasState.id.startsWith("custom_") || canvasState.id.startsWith("imported_")) && (
+                  <button
+                    type="button"
+                    className="nav-dropdown-item"
+                    style={{ color: "#b91c1c" }}
+                    onClick={() => {
+                      setNavDropdown(null);
+                      handleDeleteCurrentScenario();
+                    }}
+                  >
+                    <span className="item-icon">🗑️</span>
+                    <div className="item-content">
+                      <span className="item-title" style={{ color: "#b91c1c" }}>Eliminar este Escenario</span>
+                      <span className="item-desc">Borrar simulación personalizada</span>
+                    </div>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <input
             type="file"
             ref={fileInputRef}
@@ -712,11 +900,12 @@ export default function App() {
             onChange={handleFileChange}
           />
 
+          {/* HERRAMIENTAS DIRECTAS: COPILOT IA Y AYUDA */}
           <button
             type="button"
             className="nav-btn btn-ai-nav"
             onClick={() => setShowAiSettingsModal(true)}
-            title="Configurar Copilot Financiero IA (Gemini, OpenAI o Modo Offline)"
+            title="Configurar Copilot Financiero IA (Gemini, OpenAI o Modo Heurístico)"
           >
             🤖 Copilot IA
             <span
@@ -724,120 +913,6 @@ export default function App() {
               style={{ backgroundColor: hasAiKey ? "#10b981" : "#f59e0b" }}
               title={hasAiKey ? "IA activa y lista" : "Sin clave (usando modo heurístico offline)"}
             />
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-waterfall"
-            onClick={() => setShowWaterfallModal(true)}
-            title="Ver cascada interactiva de flujo de caja: Ventas -> Costos -> Utilidad -> Deuda -> Caja Libre"
-          >
-            🌊 Cascada
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-pitch"
-            onClick={() => setShowPitchModal(true)}
-            title="Ficha ejecutiva y One-Pager para comités de crédito, bancos e inversionistas"
-          >
-            🎯 One-Pager
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-bank-dossier"
-            onClick={() => setShowBankDossierModal(true)}
-            title="Generar Expediente Oficial de Crédito para Comités Bancarios y de Riesgo (DSCR, Amortización con Gracia, Garantías)"
-            style={{
-              backgroundColor: "#1e293b",
-              borderColor: "#0f172a",
-              color: "#f8fafc",
-              fontWeight: "700"
-            }}
-          >
-            📑 Dossier Bancario
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-publish-bizzopp"
-            onClick={() => setShowPublishToBizzoppModal(true)}
-            title="Publicar esta oportunidad estructurada directamente en el Social Feed de Bizzopp"
-            style={{
-              backgroundColor: "#059669",
-              borderColor: "#047857",
-              color: "#ffffff",
-              fontWeight: "700"
-            }}
-          >
-            🚀 Publicar en Bizzopp
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-share"
-            onClick={() => setShowShareModal(true)}
-            title="Generar enlace público para que inversionistas o socios puedan auditar este modelo en tiempo real"
-            style={{
-              backgroundColor: "#f0fdf4",
-              borderColor: "#86efac",
-              color: "#166534",
-              fontWeight: "700"
-            }}
-          >
-            🔗 Compartir
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-cloud"
-            onClick={() => setShowProjectsDashboard(true)}
-            title="Panel de Proyectos & Portafolio iNGIZER en la Nube (Supabase)"
-            style={{
-              backgroundColor: "#f8fafc",
-              borderColor: "#cbd5e1",
-              color: "#0f172a",
-              fontWeight: "600"
-            }}
-          >
-            ☁️ Nube / Portafolio
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-stress"
-            onClick={() => setShowStressModal(true)}
-            title="Simulador de estrés: fluctuaciones de demanda, punto de equilibrio y comparador de alternativas de financiación"
-          >
-            ⚡ Sensibilidad
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-forecast"
-            onClick={() => setShowForecastModal(true)}
-            title="Proyección financiera a 12 meses: rampa de arranque, punto de equilibrio y análisis de liquidez"
-          >
-            📈 Proyección 12M
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-excel"
-            onClick={() => exportCanvasToExcel(canvasState)}
-            title="Exportar libro completo a Excel (.xlsx) con fórmulas, requerimientos 2C y amortización"
-          >
-            📊 Excel (.xlsx)
-          </button>
-
-          <button
-            type="button"
-            className="nav-btn btn-pdf"
-            onClick={handlePrint}
-            title="Exportar canvas a PDF o imprimir (Ctrl+P)"
-          >
-            🖨️ PDF
           </button>
 
           <button

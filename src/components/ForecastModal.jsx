@@ -148,13 +148,27 @@ export default function ForecastModal({ isOpen, onClose, state }) {
             <div className="forecast-kpi-card">
               <div className="kpi-tag">🎯 BREAK-EVEN REQUERIDO</div>
               <div className="kpi-value">
-                {formatCurrency(breakEven.breakEvenSalesMonthly)}/mes
+                {formatCurrency(breakEven.breakEvenSalesMonthly, state?.currency)}/mes
               </div>
               <div className="kpi-meta">
-                Ventas mínimas diarias: <strong>{formatCurrency(breakEven.breakEvenSalesDaily)}/día</strong>
+                Ventas mínimas diarias: <strong>{formatCurrency(breakEven.breakEvenSalesDaily, state?.currency)}/día</strong>
               </div>
               <div className="kpi-tip">
                 Margen de seguridad: <strong>{breakEven.marginOfSafetyPercent}%</strong> {breakEven.isAboveBreakEven ? "por encima" : "por debajo"}
+              </div>
+            </div>
+
+            {/* RETORNO DE INVERSIÓN (TIR, VAN, PAYBACK) */}
+            <div className="forecast-kpi-card" style={{ borderColor: summary.npv > 0 ? "#86efac" : "#fcd34d" }}>
+              <div className="kpi-tag">🚀 RETORNO & VALOR (TIR / VAN)</div>
+              <div className="kpi-value" style={{ color: summary.irr && summary.irr > 20 ? "#059669" : "#2563eb" }}>
+                {summary.irr !== null ? `${summary.irr}% E.A.` : "En maduración"}
+              </div>
+              <div className="kpi-meta">
+                VAN (15% EA): <strong style={{ color: summary.npv >= 0 ? "#059669" : "#dc2626" }}>{formatCurrency(summary.npv, state?.currency)}</strong>
+              </div>
+              <div className="kpi-tip">
+                Payback: <strong>{summary.paybackMonths !== null ? `${summary.paybackMonths} meses` : "> 12 meses"}</strong>
               </div>
             </div>
           </div>

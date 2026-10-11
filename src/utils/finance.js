@@ -624,6 +624,15 @@ export function calculate12MonthForecast(state, options = {}) {
   const isCashDeficit = lowestCash < 0;
   const cashDeficitAmount = isCashDeficit ? Math.abs(lowestCash) : 0;
 
+  // Evaluación de Retorno de Inversión (TIR, VAN, Payback)
+  const totalInvestmentTarget = metrics.totalInvestmentNeeded > 0
+    ? metrics.totalInvestmentNeeded
+    : (metrics.totalCapexNeeded > 0 ? metrics.totalCapexNeeded : (metrics.totalA || 0));
+  const monthlyFlows = months.map((m) => m.netCashFlow);
+  const npv = calculateNPV(options.discountRateAnnual || 15, totalInvestmentTarget, monthlyFlows);
+  const irr = calculateIRR(totalInvestmentTarget, monthlyFlows);
+  const paybackMonths = calculatePaybackPeriod(totalInvestmentTarget, monthlyFlows);
+
   return {
     initialCash,
     months,
@@ -642,7 +651,112 @@ export function calculate12MonthForecast(state, options = {}) {
       totalYearDebtService,
       totalYearNetCash,
       overallGrowthYear: baseSales > 0 ? Math.round(((totalYearRevenue / (baseSales * 12)) - 1) * 1000) / 10 : 0,
+      totalInvestmentTarget,
+      npv,
+      irr,
+      paybackMonths,
     },
   };
 }
+
+/**
+ * Calcula el Valor Actual Neto (VAN / NPV) de una serie de flujos mensuales descontados a una tasa efectiva anual.
+ * @param {number} discountRateAnnual - Tasa de descuento E.A. (ej. 15 para 15%)
+ * @param {number} initialInvestment - Inversión inicial en tiempo 0 (positiva)
+ * @param {Array<number>} cashFlows - Array de flujos de caja mensuales
+ * @returns {number} VAN / NPV redondeado
+ */
+export function calculateNPV(discountRateAnnual, initialInvestment, cashFlows) {
+  const i0 = Number(initialInvestment) || 0;
+  const flows = Array.isArray(cashFlows) ? cashFlows.map(Number) : [];
+  if (flows.length === 0) return -i0;
+
+  const rateEA = (Number(discountRateAnnual) || 15) / 100;
+  const monthlyRate = Math.pow(1 + rateEA, 1 / 12) - 1;
+
+  let npv = -i0;
+  for (let t = 0; t < flows.length; t++) {
+    const cf = flows[t];
+    npv += cf / Math.pow(1 + monthlyRate, t + 1);
+  }
+  return Math.round(npv);
+}
+
+/**
+ * Calcula la Tasa Interna de Retorno Anualizada (TIR / IRR) mediante el algoritmo numérico de bisección.
+ * @param {number} initialInvestment - Inversión inicial en t=0 (positiva)
+ * @param {Array<number>} cashFlows - Flujos de caja mensuales
+ * @returns {number|null} TIR efectiva anual en porcentaje (ej. 45.2) o null si no converge
+ */
+export function calculateIRR(initialInvestment, cashFlows) {
+  const i0 = Number(initialInvestment) || 0;
+  const flows = Array.isArray(cashFlows) ? cashFlows.map(Number) : [];
+  if (i0 <= 0 || flows.length === 0) return null;
+
+  const totalInflows = flows.reduce((a, b) => a + b, 0);
+  if (totalInflows <= 0) return null;
+
+  function npvAtMonthlyRate(r) {
+    let sum = -i0;
+    for (let t = 0; t < flows.length; t++) {
+      sum += flows[t] / Math.pow(1 + r, t + 1);
+    }
+    return sum;
+  }
+
+  // Bisección entre -90% mensual y +500% mensual
+  let low = -0.9;
+  let high = 5.0;
+  const npvLow = npvAtMonthlyRate(low);
+  const npvHigh = npvAtMonthlyRate(high);
+
+  if (npvLow < 0) return null; // No alcanza a ser positivo
+  if (npvHigh > 0) return 999; // Retorno extraordinariamente alto (>999%)
+
+  for (let iter = 0; iter < 100; iter++) {
+    const mid = (low + high) / 2;
+    const npvMid = npvAtMonthlyRate(mid);
+
+    if (Math.abs(npvMid) < 1.0) {
+      const irrAnnual = (Math.pow(1 + mid, 12) - 1) * 100;
+      return Math.round(irrAnnual * 10) / 10;
+    }
+
+    if (npvMid > 0) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  const finalMid = (low + high) / 2;
+  const irrAnnual = (Math.pow(1 + finalMid, 12) - 1) * 100;
+  return Math.round(irrAnnual * 10) / 10;
+}
+
+/**
+ * Calcula el Periodo de Recuperación de la Inversión (Payback) en meses.
+ * @param {number} initialInvestment - Inversión inicial
+ * @param {Array<number>} cashFlows - Flujos mensuales
+ * @returns {number|null} Meses de recuperación (ej. 8.5) o null si no recupera en el horizonte
+ */
+export function calculatePaybackPeriod(initialInvestment, cashFlows) {
+  const i0 = Number(initialInvestment) || 0;
+  const flows = Array.isArray(cashFlows) ? cashFlows.map(Number) : [];
+  if (i0 <= 0) return 0;
+  if (flows.length === 0) return null;
+
+  let cumulative = 0;
+  for (let m = 0; m < flows.length; m++) {
+    const prev = cumulative;
+    cumulative += flows[m];
+    if (cumulative >= i0) {
+      const needed = i0 - prev;
+      const fraction = flows[m] > 0 ? needed / flows[m] : 0;
+      return Math.round((m + fraction) * 10) / 10;
+    }
+  }
+  return null;
+}
+
 
