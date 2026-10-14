@@ -69,13 +69,32 @@ Genera una respuesta ejecutiva, directa, cuantitativa y accionable (máximo 3 p�
 export async function queryAiCopilot({ provider, apiKey, moduleId, state, metrics, query }) {
   // Verificación de consentimiento informado de privacidad (SEC-03)
   if (typeof window !== "undefined" && provider !== "local") {
-    const hasConsent = localStorage.getItem("bcc_ai_data_consent") === "true";
+    const hasConsent = localStorage.getItem("bcc_ai_data_consent") !== "false";
     if (!hasConsent) {
       return generateHeuristicFallback(moduleId, state, metrics, query);
     }
   }
 
   const prompt = buildFinancialPrompt(moduleId, state, metrics, query);
+
+  // 1. Intentar Proxy Backend del Servidor si se seleccionó 'server' o si no hay API key de cliente
+  if (provider === "server" || (!apiKey && provider !== "local")) {
+    try {
+      const serverRes = await fetch("/api/ai/copilot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, provider }),
+      });
+      if (serverRes.ok) {
+        const data = await serverRes.json();
+        if (data.ok && data.text) {
+          return data.text;
+        }
+      }
+    } catch (e) {
+      console.warn("[AI Proxy] Servidor no disponible, usando fallback:", e.message);
+    }
+  }
 
   // Si no hay API key configurada, retorna inmediatamente el motor heurístico
   if (!apiKey || !apiKey.trim()) {

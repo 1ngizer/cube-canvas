@@ -210,10 +210,10 @@ export default function App() {
   // Comprobar estado de configuración de IA
   const checkAiConfig = () => {
     if (typeof window !== "undefined") {
-      const p = localStorage.getItem("bcc_ai_provider") || "gemini";
+      const p = localStorage.getItem("bcc_ai_provider") || "server";
       const k = localStorage.getItem("bcc_ai_api_key") || "";
-      const consent = localStorage.getItem("bcc_ai_data_consent") === "true";
-      setHasAiKey(p === "local" || (!!k.trim() && consent));
+      const consent = localStorage.getItem("bcc_ai_data_consent") !== "false";
+      setHasAiKey(p === "local" || p === "server" || (!!k.trim() && consent));
     }
   };
 

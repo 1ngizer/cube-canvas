@@ -87,13 +87,37 @@ export default function PublishToBizzoppModal({ isOpen, onClose, state, metrics 
       category,
       city,
       description: description.trim(),
+      // Compatibilidad universal con backend BizzOpp (camelCase y snake_case)
+      founderName: founderName.trim(),
       founder_name: founderName.trim(),
+      founderRole: "Fundador / Empresario",
       founder_role: "Fundador / Empresario",
-      required_amount: targetAmount,
+      founderPhone: founderPhone.trim() || undefined,
+      founder_phone: founderPhone.trim() || undefined,
+      founderEmail: founderEmail.trim() || undefined,
+      founder_email: founderEmail.trim() || undefined,
+      requiredAmount: Number(targetAmount),
+      required_amount: Number(targetAmount),
       tir: `${assetDebtReturn}% E.A.`,
       payback: `${Math.round((assetDebtTerm / 12) * 10) / 10} años (${assetDebtTerm} meses)`,
+      monthlySales: formatCurrency(sales),
       monthly_sales: formatCurrency(sales),
+      mediaUrl: activeMediaUrl,
       media_url: activeMediaUrl,
+      useOfFunds: [
+        { item: "Inversión en Activos Productivos / CAPEX", amount: targetAmount, percentage: 100 }
+      ],
+      use_of_funds: [
+        { item: "Inversión en Activos Productivos / CAPEX", amount: targetAmount, percentage: 100 }
+      ],
+      founders: [
+        {
+          name: founderName.trim(),
+          role: "Fundador / Empresario",
+          phone: founderPhone.trim() || undefined,
+          email: founderEmail.trim() || undefined
+        }
+      ],
       financials: [
         { label: "Ventas Mensuales", value: formatCurrency(sales) },
         { label: "Utilidad Operativa (EBITDA)", value: formatCurrency(operatingProfit) },
@@ -112,10 +136,10 @@ export default function PublishToBizzoppModal({ isOpen, onClose, state, metrics 
       }
     };
 
-    // Intentar primero el endpoint de producción oficial de Bizzopp, con fallback a Railway
+    // Intentar primero el endpoint de producción directo de Railway, con fallback a dominio personalizado
     const endpoints = [
-      "https://bizzopp.ingizer.com/api/projects",
-      "https://bizzopp-production.up.railway.app/api/projects"
+      "https://bizzopp-production.up.railway.app/api/projects",
+      "https://bizzopp.ingizer.com/api/projects"
     ];
 
     let successResponse = null;

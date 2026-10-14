@@ -32,18 +32,12 @@ const server = http.createServer((req, res) => {
 
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     return res.end();
-  }
-
-  // Reject unsupported HTTP methods
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { 'Content-Type': 'text/plain' });
-    return res.end('Method Not Allowed');
   }
 
   // Parse path
@@ -61,6 +55,116 @@ const server = http.createServer((req, res) => {
   if (pathname === '/health' || pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     return res.end('OK');
+  }
+
+  // PROXY BACKEND IA (/api/ai/copilot)
+  if (pathname === '/api/ai/copilot') {
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed' }));
+    }
+
+    let body = '';
+    let bytes = 0;
+    const MAX_BYTES = 100000; // 100kb limit
+
+    req.on('data', chunk => {
+      bytes += chunk.length;
+      if (bytes > MAX_BYTES) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, error: 'Payload Too Large' }));
+      }
+      body += chunk;
+    });
+
+    req.on('end', async () => {
+      try {
+        const parsedBody = body ? JSON.parse(body) : {};
+        const prompt = parsedBody.prompt;
+        if (!prompt || typeof prompt !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ ok: false, error: 'prompt is required' }));
+        }
+
+        const geminiKey = process.env.GEMINI_API_KEY;
+        const openaiKey = process.env.OPENAI_API_KEY;
+
+        if (geminiKey) {
+          try {
+            const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+            const gRes = await fetch(gUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.4, maxOutputTokens: 800 }
+              })
+            });
+
+            if (gRes.ok) {
+              const gData = await gRes.json();
+              const replyText = gData.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (replyText) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ ok: true, text: replyText, provider: 'gemini-server' }));
+              }
+            } else {
+              const errData = await gRes.json().catch(() => ({}));
+              console.warn('[AI Proxy] Gemini error HTTP ' + gRes.status, errData);
+            }
+          } catch (gErr) {
+            console.warn('[AI Proxy] Error conectando a Gemini API:', gErr.message);
+          }
+        }
+
+        if (openaiKey) {
+          try {
+            const oRes = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openaiKey}`
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.4,
+                max_tokens: 800
+              })
+            });
+
+            if (oRes.ok) {
+              const oData = await oRes.json();
+              const replyText = oData.choices?.[0]?.message?.content;
+              if (replyText) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ ok: true, text: replyText, provider: 'openai-server' }));
+              }
+            }
+          } catch (oErr) {
+            console.warn('[AI Proxy] Error conectando a OpenAI API:', oErr.message);
+          }
+        }
+
+        // Si no hay API key configurada en las variables de entorno de Railway
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({
+          ok: false,
+          error: 'no_server_key',
+          message: 'El servidor no tiene configurada GEMINI_API_KEY ni OPENAI_API_KEY en variables de entorno.'
+        }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Reject unsupported HTTP methods for other routes
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { 'Content-Type': 'text/plain' });
+    return res.end('Method Not Allowed');
   }
 
   // Directory traversal check

@@ -2,18 +2,18 @@ import React, { useState, useEffect } from "react";
 import { queryAiCopilot } from "../utils/aiService";
 
 export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSaveSuccess }) {
-  const [provider, setProvider] = useState("gemini");
+  const [provider, setProvider] = useState("server");
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null); // { success: boolean, message: string }
-  const [dataConsent, setDataConsent] = useState(false);
+  const [dataConsent, setDataConsent] = useState(true);
 
   useEffect(() => {
     if (isOpen && typeof window !== "undefined") {
-      const storedProvider = localStorage.getItem("bcc_ai_provider") || "gemini";
+      const storedProvider = localStorage.getItem("bcc_ai_provider") || "server";
       const storedKey = localStorage.getItem("bcc_ai_api_key") || "";
-      const storedConsent = localStorage.getItem("bcc_ai_data_consent") === "true";
+      const storedConsent = localStorage.getItem("bcc_ai_data_consent") !== "false";
       setProvider(storedProvider);
       setApiKey(storedKey);
       setDataConsent(storedConsent);
@@ -27,7 +27,7 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
     if (provider !== "local" && !dataConsent) {
       setTestResult({
         success: false,
-        message: "⚠️ Debes marcar la casilla de consentimiento de privacidad para enviar cifras a un LLM externo, o seleccionar el 'Motor Heurístico Local' offline.",
+        message: "⚠️ Debes marcar la casilla de consentimiento de privacidad para consultar el copiloto IA, o seleccionar el 'Motor Heurístico Local' offline.",
       });
       return;
     }
@@ -35,8 +35,10 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
     if (typeof window !== "undefined") {
       localStorage.setItem("bcc_ai_provider", provider);
       localStorage.setItem("bcc_ai_data_consent", String(dataConsent));
-      if (provider === "local") {
-        localStorage.removeItem("bcc_ai_api_key");
+      if (provider === "local" || provider === "server") {
+        if (provider === "local") {
+          localStorage.removeItem("bcc_ai_api_key");
+        }
       } else {
         localStorage.setItem("bcc_ai_api_key", apiKey.trim());
       }
@@ -48,13 +50,13 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
   const handleClear = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("bcc_ai_api_key");
-      localStorage.setItem("bcc_ai_provider", "local");
+      localStorage.setItem("bcc_ai_provider", "server");
     }
     setApiKey("");
-    setProvider("local");
+    setProvider("server");
     setTestResult({
       success: true,
-      message: "Clave eliminada. Ahora se usará el Motor Heurístico Experto Offline.",
+      message: "Clave personal eliminada. Se usará el Servidor iNGIZER Cloud o el Motor Heurístico de respaldo.",
     });
   };
 
@@ -62,8 +64,56 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
     if (provider === "local") {
       setTestResult({
         success: true,
-        message: "✅ Motor Heurístico Experto Local verificado y listo para operar sin conexión.",
+        message: "✅ Motor Heurístico Experto Local verificado y listo para operar 100% offline sin conexión.",
       });
+      return;
+    }
+
+    if (provider === "server") {
+      setTesting(true);
+      setTestResult(null);
+      try {
+        const res = await fetch("/api/ai/copilot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: "Test de conectividad. Responde en 1 sola frase corta indicando que estás listo.",
+            provider: "server"
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && data.text) {
+            setTestResult({
+              success: true,
+              message: `✅ ¡Conexión con el Servidor iNGIZER Cloud exitosa! (${data.provider || "Proxy Activo"}). El Copilot responderá automáticamente.`,
+            });
+          } else if (data.error === "no_server_key") {
+            setTestResult({
+              success: false,
+              message: "ℹ️ El servidor está en línea pero no tiene configurada GEMINI_API_KEY en Railway. Puedes ingresar tu clave personal seleccionando Google Gemini / OpenAI o continuar con el motor heurístico.",
+            });
+          } else {
+            setTestResult({
+              success: false,
+              message: `⚠️ Servidor respondió: ${data.message || data.error || "Estado no disponible"}`,
+            });
+          }
+        } else {
+          setTestResult({
+            success: false,
+            message: `❌ Error del servidor: HTTP ${res.status}`,
+          });
+        }
+      } catch (err) {
+        setTestResult({
+          success: false,
+          message: `❌ Error al conectar con el servidor: ${err.message}`,
+        });
+      } finally {
+        setTesting(false);
+      }
       return;
     }
 
@@ -134,14 +184,29 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
 
         <p className="ai-modal-desc">
           Cube Canvas incluye un copiloto financiero con análisis en tiempo real de viabilidad,
-          riesgos de liquidez y estructura de capital stack. Puedes conectar tu propio modelo LLM
-          o usar el motor heurístico offline gratuito.
+          riesgos de liquidez y estructura de capital stack. Puedes usar la IA en la nube de iNGIZER,
+          conectar tu propia clave (BYOK) o usar el motor heurístico offline gratuito.
         </p>
 
         {/* SELECCIÓN DE PROVEEDOR */}
         <div className="form-group" style={{ marginTop: "1rem" }}>
           <label className="field-label">Proveedor de Inteligencia Artificial:</label>
           <div className="ai-provider-grid">
+            <label className={`ai-provider-card ${provider === "server" ? "active" : ""}`}>
+              <input
+                type="radio"
+                name="provider"
+                value="server"
+                checked={provider === "server"}
+                onChange={(e) => setProvider(e.target.value)}
+              />
+              <div className="provider-info">
+                <span className="provider-name">🤖 Servidor iNGIZER Cloud</span>
+                <span className="provider-badge rec">Recomendado</span>
+                <p className="provider-sub">Conexión automática y segura sin necesidad de ingresar claves en el navegador.</p>
+              </div>
+            </label>
+
             <label className={`ai-provider-card ${provider === "gemini" ? "active" : ""}`}>
               <input
                 type="radio"
@@ -152,8 +217,8 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
               />
               <div className="provider-info">
                 <span className="provider-name">Google Gemini 2.5 Flash</span>
-                <span className="provider-badge rec">Recomendado</span>
-                <p className="provider-sub">Ultra rápido, 1M contexto, ideal para finanzas complejas.</p>
+                <span className="provider-badge">BYOK Gemini</span>
+                <p className="provider-sub">Ultra rápido, 1M contexto, usando tu propia clave de Google AI Studio.</p>
               </div>
             </label>
 
@@ -167,8 +232,8 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
               />
               <div className="provider-info">
                 <span className="provider-name">OpenAI GPT-4o-mini</span>
-                <span className="provider-badge">OpenAI</span>
-                <p className="provider-sub">Excelente razonamiento analítico y estructuración estratégica.</p>
+                <span className="provider-badge">BYOK OpenAI</span>
+                <p className="provider-sub">Excelente razonamiento analítico con tu propia clave de OpenAI.</p>
               </div>
             </label>
 
@@ -189,8 +254,15 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
           </div>
         </div>
 
-        {/* CAMPO DE API KEY */}
-        {provider !== "local" && (
+        {/* MENSAJE EXPLICATIVO SI ES SERVIDOR */}
+        {provider === "server" && (
+          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px", padding: "10px 12px", marginTop: "0.75rem", fontSize: "0.82rem", color: "#166534" }}>
+            🛡️ <strong>Modo Proxy Seguro:</strong> Las consultas se ejecutan a través de <code>/api/ai/copilot</code> en el backend de Railway. Tus credenciales no se exponen al cliente.
+          </div>
+        )}
+
+        {/* CAMPO DE API KEY (SOLO BYOK GEMINI U OPENAI) */}
+        {(provider === "gemini" || provider === "openai") && (
           <div className="form-group" style={{ marginTop: "0.75rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <label className="field-label">
@@ -265,15 +337,14 @@ export default function AiSettingsModal({ isOpen, onClose, state, metrics, onSav
                 style={{ marginTop: "2px" }}
               />
               <span>
-                <strong>Acepto compartir las métricas financieras del lienzo con {provider === "gemini" ? "Google Gemini" : "OpenAI"}.</strong> Entiendo que las cifras de ventas, costos, caja y deuda se enviarán en el prompt para generar el diagnóstico financiero.
+                <strong>Acepto compartir las métricas financieras del lienzo con el copiloto ({provider === "server" ? "Servidor iNGIZER Cloud" : provider === "gemini" ? "Google Gemini" : "OpenAI"}).</strong> Entiendo que las cifras de ventas, costos, caja y deuda se enviarán en el prompt para generar el diagnóstico financiero.
               </span>
             </label>
           </div>
         )}
 
         <div className="ai-privacy-note">
-          🔒 <strong>Seguridad & Privacidad:</strong> Tu clave se guarda exclusivamente en tu navegador (localStorage).
-          Nunca viaja a intermediarios ni a servidores de iNGIZER.
+          🔒 <strong>Seguridad & Privacidad:</strong> En modo servidor las claves residen en Railway. En modo BYOK tu clave se almacena exclusivamente en tu navegador (localStorage).
         </div>
 
         {/* BOTONES DE ACCIÓN */}
